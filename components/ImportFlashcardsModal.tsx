@@ -11,7 +11,7 @@ import { OCRProcessor, OCRResult } from '../utils/ocrProcessor';
 interface ImportFlashcardsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  setFlashcards: React.Dispatch<React.SetStateAction<Flashcard[]>>;
+  onImport: (flashcards: any[]) => void;
   deckId: string;
 }
 
@@ -27,7 +27,7 @@ interface GeminiFlashcardResponseItem {
   forgetting_curve_optimized?: boolean;
 }
 
-const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, onClose, setFlashcards, deckId }) => {
+const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, onClose, onImport, deckId }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -538,7 +538,7 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
       
       // Mostrar resultados finales
       if (allGeneratedFlashcards.length > 0) {
-        setFlashcards(prev => [...prev, ...allGeneratedFlashcards]);
+        onImport(allGeneratedFlashcards);
         let successMessage = `✅ ${allGeneratedFlashcards.length} flashcards generadas e importadas de ${successfulChunks} fragmento(s) exitoso(s).`;
         if (chunkErrors > 0) {
           successMessage += ` ⚠️ ${chunkErrors} fragmento(s) no pudieron ser procesados debido a límites de tokens o errores de API.`;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
 import HomeScreen from './screens/HomeScreen';
@@ -19,6 +19,7 @@ import ScheduleScreen from './screens/ScheduleScreen'; // Import ScheduleScreen
 import TestScreen from './screens/TestScreen'; // Import TestScreen
 import useDarkMode from './hooks/useDarkMode';
 import useSmartNotifications from './hooks/useSmartNotifications';
+import { initializeStorage, migrateFromLocalStorage } from './storage/init';
 import { Theme } from './types';
 
 
@@ -26,6 +27,24 @@ const App: React.FC = () => {
   const location = useLocation();
   const [theme, setTheme] = useDarkMode();
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [storageInitialized, setStorageInitialized] = useState(false);
+  
+  // Initialize storage system
+  useEffect(() => {
+    const initStorage = async () => {
+      try {
+        await initializeStorage();
+        await migrateFromLocalStorage();
+        setStorageInitialized(true);
+        console.log('🚀 Sistema de almacenamiento Sense inicializado');
+      } catch (error) {
+        console.error('Error inicializando almacenamiento:', error);
+        setStorageInitialized(true); // Continue even if storage fails
+      }
+    };
+
+    initStorage();
+  }, []);
   
   // Initialize smart notifications with empty events array (will be updated from individual components)
   const {
