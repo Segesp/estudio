@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePersistentSettings } from '../hooks/storage/usePersistentStore';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -29,7 +29,6 @@ const GoalsScreen: React.FC = () => {
   const { getSetting, setSetting } = usePersistentSettings();
   
   const [goals, setGoals] = useState<EnhancedGoal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentGoalText, setCurrentGoalText] = useState('');
   const [currentDescription, setCurrentDescription] = useState('');
@@ -42,31 +41,20 @@ const GoalsScreen: React.FC = () => {
   // Cargar metas desde almacenamiento persistente
   useEffect(() => {
     const loadGoals = async () => {
-      try {
-        setIsLoading(true);
-        const savedGoals = await getSetting<EnhancedGoal[]>('enhanced-goals');
-        if (savedGoals && Array.isArray(savedGoals)) {
-          setGoals(savedGoals);
-        }
-      } catch (error) {
-        console.error('Error loading goals:', error);
-      } finally {
-        setIsLoading(false);
+      const savedGoals = await getSetting<EnhancedGoal[]>('enhanced-goals');
+      if (savedGoals) {
+        setGoals(savedGoals);
       }
     };
     loadGoals();
   }, [getSetting]);
 
-  // Función para guardar metas de manera controlada
-  const saveGoals = useCallback(async (updatedGoals: EnhancedGoal[]) => {
-    try {
-      await setSetting('enhanced-goals', updatedGoals);
-    } catch (error) {
-      console.error('Error saving goals:', error);
-    }
-  }, [setSetting]);
+  // Guardar metas cuando cambien
+  useEffect(() => {
+    setSetting('enhanced-goals', goals);
+  }, [goals, setSetting]);
 
-  const getCategoryInfo = useCallback((category: GoalCategory) => {
+  const getCategoryInfo = (category: GoalCategory) => {
     switch (category) {
       case 'daily':
         return { name: 'Diarias', icon: '📅', color: 'bg-blue-500' };
@@ -79,9 +67,9 @@ const GoalsScreen: React.FC = () => {
       default:
         return { name: 'General', icon: '📝', color: 'bg-gray-500' };
     }
-  }, []);
+  };
 
-  const getPriorityColor = useCallback((priority: GoalPriority) => {
+  const getPriorityColor = (priority: GoalPriority) => {
     switch (priority) {
       case 'high':
         return 'border-l-4 border-red-500';
@@ -90,7 +78,7 @@ const GoalsScreen: React.FC = () => {
       case 'low':
         return 'border-l-4 border-green-500';
     }
-  }, []);
+  };
 
   const handleAddOrUpdateGoal = async () => {
     if (!currentGoalText.trim()) {
@@ -98,20 +86,18 @@ const GoalsScreen: React.FC = () => {
       return;
     }
 
-    let updatedGoals: EnhancedGoal[];
-
     if (editingGoal) {
-      updatedGoals = goals.map(g => g.id === editingGoal.id ? { 
+      setGoals(prev => prev.map(g => g.id === editingGoal.id ? { 
         ...g, 
         text: currentGoalText,
         description: currentDescription,
         category: currentCategory,
         priority: currentPriority,
         dueDate: currentDueDate || undefined
-      } : g);
+      } : g));
     } else {
       const newGoal: EnhancedGoal = {
-        id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9), // ID más único
+        id: Date.now().toString(),
         text: currentGoalText,
         description: currentDescription,
         completed: false,
@@ -121,16 +107,12 @@ const GoalsScreen: React.FC = () => {
         createdAt: new Date().toISOString(),
         subtasks: []
       };
-      updatedGoals = [newGoal, ...goals];
+      setGoals(prev => [newGoal, ...prev]);
     }
-
-    // Actualizar estado y guardar de forma secuencial
-    setGoals(updatedGoals);
-    await saveGoals(updatedGoals);
     closeModal();
   };
 
-  const openModalForNew = useCallback(() => {
+  const openModalForNew = () => {
     setEditingGoal(null);
     setCurrentGoalText('');
     setCurrentDescription('');
@@ -138,9 +120,9 @@ const GoalsScreen: React.FC = () => {
     setCurrentPriority('medium');
     setCurrentDueDate('');
     setIsModalOpen(true);
-  }, []);
+  };
 
-  const openModalForEdit = useCallback((goal: EnhancedGoal) => {
+  const openModalForEdit = (goal: EnhancedGoal) => {
     setEditingGoal(goal);
     setCurrentGoalText(goal.text);
     setCurrentDescription(goal.description || '');
@@ -148,17 +130,17 @@ const GoalsScreen: React.FC = () => {
     setCurrentPriority(goal.priority);
     setCurrentDueDate(goal.dueDate || '');
     setIsModalOpen(true);
-  }, []);
+  };
 
-  const closeModal = useCallback(() => {
+  const closeModal = () => {
     setIsModalOpen(false);
     setEditingGoal(null);
     setCurrentGoalText('');
     setCurrentDescription('');
-  }, []);
+  };
 
-  const toggleGoalCompletion = useCallback(async (goalId: string) => {
-    const updatedGoals = goals.map(g => 
+  const toggleGoalCompletion = (goalId: string) => {
+    setGoals(prev => prev.map(g => 
       g.id === goalId 
         ? { 
             ...g, 
@@ -166,50 +148,29 @@ const GoalsScreen: React.FC = () => {
             completedAt: !g.completed ? new Date().toISOString() : undefined
           }
         : g
-    );
-    
-    setGoals(updatedGoals);
-    await saveGoals(updatedGoals);
-  }, [goals, saveGoals]);
+    ));
+  };
 
-  const deleteGoal = useCallback(async (goalId: string) => {
+  const deleteGoal = (goalId: string) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar esta meta?')) {
-      const updatedGoals = goals.filter(g => g.id !== goalId);
-      setGoals(updatedGoals);
-      await saveGoals(updatedGoals);
+      setGoals(prev => prev.filter(g => g.id !== goalId));
     }
-  }, [goals, saveGoals]);
+  };
 
-  const filteredGoals = useMemo(() => {
-    return activeCategory === 'all' 
-      ? goals 
-      : goals.filter(goal => goal.category === activeCategory);
-  }, [goals, activeCategory]);
+  const filteredGoals = activeCategory === 'all' 
+    ? goals 
+    : goals.filter(goal => goal.category === activeCategory);
 
-  const getStats = useCallback(() => {
+  const getStats = () => {
     const total = goals.length;
     const completed = goals.filter(g => g.completed).length;
     const pending = total - completed;
     const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
     
     return { total, completed, pending, completionRate };
-  }, [goals]);
+  };
 
-  const stats = useMemo(() => getStats(), [getStats]);
-
-  // Mostrar loading state
-  if (isLoading) {
-    return (
-      <div className="p-4 space-y-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Cargando metas...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const stats = getStats();
 
   return (
     <div className="p-4 space-y-6">

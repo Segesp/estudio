@@ -630,9 +630,61 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
             </div>
           </div>
           {selectedFile && (
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-              Archivo seleccionado: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
-            </p>
+            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="flex items-start space-x-3">
+                <div className="flex-shrink-0">
+                  {selectedFile.type.startsWith('image/') ? (
+                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">🖼️</span>
+                    </div>
+                  ) : selectedFile.type === 'application/pdf' ? (
+                    <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">📄</span>
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">📝</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                    {selectedFile.name}
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {(selectedFile.size / 1024).toFixed(2)} KB
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">
+                    {selectedFile.type || 'Tipo desconocido'}
+                  </p>
+                  {selectedFile.type.startsWith('image/') && (
+                    <div className="mt-2">
+                      <img 
+                        src={URL.createObjectURL(selectedFile)} 
+                        alt="Preview"
+                        className="max-w-full h-32 object-contain rounded border border-slate-200 dark:border-slate-600"
+                        onLoad={(e) => {
+                          // Liberar la URL cuando la imagen se cargue
+                          setTimeout(() => URL.revokeObjectURL(e.currentTarget.src), 1000);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setExtractedText(null);
+                    setOcrResult(null);
+                    setFeedbackMessage(null);
+                  }}
+                  className="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <span className="sr-only">Remover archivo</span>
+                  ✕
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
@@ -698,19 +750,15 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
         )}
 
         {extractedText && ocrResult && (
-          <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border">
-            <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              ✅ Texto extraído ({ocrResult.processingMethod})
-            </h4>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-              Caracteres: {extractedText.length}
-              {ocrResult.confidence && ` | Confianza OCR: ${ocrResult.confidence.toFixed(1)}%`}
-              {ocrResult.totalPages && ` | Páginas: ${ocrResult.totalPages}`}
-            </p>
-            <div className="max-h-32 overflow-y-auto bg-white dark:bg-slate-700 p-2 rounded text-xs text-slate-600 dark:text-slate-300 border">
-              {extractedText.substring(0, 500)}{extractedText.length > 500 ? '...' : ''}
-            </div>
-            <div className="mt-2 flex justify-end">
+          <div className="space-y-4 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <span className="text-green-500">✅</span>
+                Texto extraído exitosamente
+                <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                  {ocrResult.processingMethod}
+                </span>
+              </h4>
               <Button 
                 size="sm" 
                 variant="ghost" 
@@ -727,16 +775,67 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
                     URL.revokeObjectURL(url);
                   }
                 }}
+                className="text-xs"
               >
-                💾 Descargar texto extraído
+                📥 Descargar texto
               </Button>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{extractedText.length}</p>
+                <p className="text-xs text-slate-500">Caracteres</p>
+              </div>
+              <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{extractedText.split(/\s+/).length}</p>
+                <p className="text-xs text-slate-500">Palabras</p>
+              </div>
+              {ocrResult.confidence && (
+                <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{ocrResult.confidence.toFixed(1)}%</p>
+                  <p className="text-xs text-slate-500">Confianza OCR</p>
+                </div>
+              )}
+              {ocrResult.totalPages && (
+                <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{ocrResult.totalPages}</p>
+                  <p className="text-xs text-slate-500">Páginas</p>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <h5 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Vista previa del contenido:</h5>
+              <div className="bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 overflow-hidden">
+                <div className="max-h-48 overflow-y-auto p-4">
+                  <pre className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+                    {extractedText.length > 1000 ? (
+                      <>
+                        {extractedText.substring(0, 1000)}
+                        <span className="text-slate-400 dark:text-slate-500">
+                          {'\n\n... '}({extractedText.length - 1000} caracteres más){' ...'}
+                        </span>
+                      </>
+                    ) : (
+                      extractedText
+                    )}
+                  </pre>
+                </div>
+                {extractedText.length > 1000 && (
+                  <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 border-t border-slate-200 dark:border-slate-600">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Mostrando los primeros 1000 caracteres. El texto completo se usará para generar las flashcards.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
 
       <div className="mt-6 flex justify-end space-x-2">
-        <Button variant="secondary" onClick={handleClose} disabled={isLoading}>
+        <Button variant="secondary" onClick={onClose} disabled={isLoading}>
           {feedbackMessage?.type === 'success' ? 'Cerrar' : 'Cancelar'}
         </Button>
         <Button onClick={handleProcessDocument} disabled={isLoading || !selectedFile}>
