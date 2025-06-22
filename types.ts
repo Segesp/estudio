@@ -48,12 +48,12 @@ export interface WellbeingTip {
   icon?: React.ReactNode;
 }
 
-// For Spaced Repetition Practice
+// For Spaced Repetition Practice - Enhanced SM-2 Algorithm
 export enum ReviewOutcome {
-  AGAIN = 'AGAIN', // Corresponds to SM-2 quality 0 or 1
-  HARD = 'HARD',   // Corresponds to SM-2 quality 2 or 3
-  GOOD = 'GOOD',   // Corresponds to SM-2 quality 4
-  EASY = 'EASY',   // Corresponds to SM-2 quality 5
+  AGAIN = 'AGAIN', // Complete failure - forgot entirely (SM-2 quality: 0)
+  HARD = 'HARD',   // Difficult recall - remembered with significant effort (SM-2 quality: 2)
+  GOOD = 'GOOD',   // Good recall - remembered correctly with minor hesitation (SM-2 quality: 4)
+  EASY = 'EASY',   // Perfect recall - remembered effortlessly and quickly (SM-2 quality: 5)
 }
 
 export interface PomodoroSettings {

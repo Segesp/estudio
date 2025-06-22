@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useLocalStorage from '../hooks/useLocalStorage';
 import { Flashcard, ReviewOutcome, SessionReflection } from '../types';
@@ -9,7 +9,7 @@ import useNotifications from '../hooks/useNotifications'; // Import the hook
 
 const DEFAULT_DECK_ID = 'default-deck';
 
-// SM-2 Algorithm Implementation based on user specification
+// Optimized SM-2 Algorithm with Enhanced Forgetting Curve Implementation
 const applySM2 = (card: Flashcard, quality: number, elaboration?: string): Flashcard => {
   let newInterval: number;
   let newRepetitions: number;
@@ -17,25 +17,51 @@ const applySM2 = (card: Flashcard, quality: number, elaboration?: string): Flash
 
   if (quality < 0 || quality > 5) throw new Error("Quality must be between 0 and 5");
 
+  // Enhanced failure handling - progressive penalties
   if (quality < 3) { 
     newRepetitions = 0; 
-    newInterval = 1;    
+    // More aggressive reset for very poor performance
+    if (quality === 0) {
+      newInterval = 1; // Again - see it again soon
+      newEasiness = Math.max(1.3, newEasiness - 0.2); // Significant penalty
+    } else if (quality === 1) {
+      newInterval = 1; // Hard - still needs immediate review
+      newEasiness = Math.max(1.3, newEasiness - 0.15);
+    } else { // quality === 2
+      newInterval = 2; // Somewhat hard
+      newEasiness = Math.max(1.3, newEasiness - 0.1);
+    }
   } else { 
+    // Success - progressive intervals
     newRepetitions = card.repetitions + 1;
+    
     if (newRepetitions === 1) {
-      newInterval = 1;
+      newInterval = quality === 5 ? 4 : 1; // Easy first time gets longer interval
     } else if (newRepetitions === 2) {
-      newInterval = 6;
+      newInterval = quality === 5 ? 10 : 6;
     } else {
-      newInterval = Math.round(card.interval * newEasiness);
+      // Enhanced interval calculation with quality bonus
+      const baseInterval = Math.round(card.interval * newEasiness);
+      const qualityMultiplier = quality === 5 ? 1.3 : (quality === 4 ? 1.0 : 0.9);
+      newInterval = Math.round(baseInterval * qualityMultiplier);
+    }
+    
+    // Improved easiness factor calculation
+    newEasiness = newEasiness + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    
+    // Quality bonus for consistent good performance
+    if (quality >= 4 && card.qualityHistory.slice(-2).every(h => h.quality >= 4)) {
+      newEasiness += 0.05; // Bonus for consecutive good reviews
     }
   }
   
-  newEasiness = newEasiness + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-  if (newEasiness < 1.3) newEasiness = 1.3; 
+  // Enhanced bounds with maximum cap
+  newEasiness = Math.max(1.3, Math.min(2.5, newEasiness));
+  newInterval = Math.max(1, Math.min(365, newInterval));
   
-  newInterval = Math.max(1, newInterval);      
-  newInterval = Math.min(newInterval, 365);  
+  // Apply randomization to prevent clustering (±10%)
+  const randomFactor = 0.9 + Math.random() * 0.2;
+  newInterval = Math.round(newInterval * randomFactor);
 
   const nextReviewDate = new Date();
   nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
@@ -55,9 +81,9 @@ const applySM2 = (card: Flashcard, quality: number, elaboration?: string): Flash
 };
 
 
-const PracticeSessionScreen: React.FC = () => {
+const PracticeSessionScreen = () => {
   const [allFlashcards, setAllFlashcards] = useLocalStorage<Flashcard[]>('flashcards', []);
-  const [sessionReflections, setSessionReflections] = useLocalStorage<SessionReflection[]>('sessionReflections', []);
+  const [, setSessionReflections] = useLocalStorage<SessionReflection[]>('sessionReflections', []);
   
   const [reviewQueue, setReviewQueue] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
@@ -98,12 +124,36 @@ const PracticeSessionScreen: React.FC = () => {
 
   const mapOutcomeToQuality = (outcome: ReviewOutcome): number => {
     switch (outcome) {
-      case ReviewOutcome.AGAIN: return 0; 
-      case ReviewOutcome.HARD: return 2;  
-      case ReviewOutcome.GOOD: return 4;
-      case ReviewOutcome.EASY: return 5;
+      case ReviewOutcome.AGAIN: return 0; // Complete failure - forgot entirely
+      case ReviewOutcome.HARD: return 2;  // Difficult recall - remembered with effort
+      case ReviewOutcome.GOOD: return 4;  // Good recall - remembered well
+      case ReviewOutcome.EASY: return 5;  // Perfect recall - effortless
       default: return 3; 
     }
+  };
+
+  // Helper function to get human-readable time estimates
+  const getTimeEstimate = (days: number): string => {
+    if (days === 1) return "1 día";
+    if (days < 7) return `${days} días`;
+    if (days < 30) {
+      const weeks = Math.round(days / 7);
+      return weeks === 1 ? "1 semana" : `${weeks} semanas`;
+    }
+    if (days < 365) {
+      const months = Math.round(days / 30);
+      return months === 1 ? "1 mes" : `${months} meses`;
+    }
+    const years = Math.round(days / 365);
+    return years === 1 ? "1 año" : `${years} años`;
+  };
+
+  // Preview what would happen with each choice
+  const getPreviewInterval = (outcome: ReviewOutcome): number => {
+    if (!currentCard) return 1;
+    const quality = mapOutcomeToQuality(outcome);
+    const previewCard = applySM2(currentCard, quality, elaborationInputText);
+    return previewCard.interval;
   };
   
   const proceedToNextCardOrEnd = useCallback(() => {
@@ -152,26 +202,27 @@ const PracticeSessionScreen: React.FC = () => {
     
     let toastText = "";
     let toastType: 'success' | 'error' | 'info' | 'warning' = 'info';
+    const timeEstimate = getTimeEstimate(updatedCard.interval);
 
     switch (quality) {
         case 0: 
-            toastText = `No recuerdo. Se revisará mañana.`;
+            toastText = `❌ Olvidaste completamente. La verás de nuevo en ${timeEstimate}.`;
             toastType = 'error';
             break;
         case 2: 
-            toastText = `Difícil. Próxima revisión en ${updatedCard.interval} día(s).`;
+            toastText = `⚠️ Te costó recordarla. Próxima revisión en ${timeEstimate}.`;
             toastType = 'warning';
             break;
         case 4: 
-            toastText = `Bien. Próxima revisión en ${updatedCard.interval} día(s).`;
+            toastText = `✅ ¡Bien recordada! Próxima revisión en ${timeEstimate}.`;
             toastType = 'success';
             break;
         case 5: 
-            toastText = `Fácil. Próxima revisión en ${updatedCard.interval} día(s).`;
+            toastText = `🎉 ¡Perfecta! Fue muy fácil. Próxima revisión en ${timeEstimate}.`;
             toastType = 'success';
             break;
         default:
-            toastText = "Revisión registrada."; 
+            toastText = `Revisión registrada. Próxima en ${timeEstimate}.`; 
             toastType = 'info';
     }
     setFeedbackToast({ text: toastText, type: toastType });
@@ -188,6 +239,46 @@ const PracticeSessionScreen: React.FC = () => {
     setAllFlashcards, 
     proceedToNextCardOrEnd,
   ]);
+
+  // Keyboard shortcuts handler (similar to Anki)
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (animationState !== 'idle' || feedbackToast) return;
+      
+      if (!showAnswer) {
+        if (event.code === 'Space' || event.code === 'Enter') {
+          event.preventDefault();
+          setShowAnswer(true);
+        }
+      } else {
+        switch (event.code) {
+          case 'Digit1':
+          case 'Numpad1':
+            event.preventDefault();
+            handleReview(ReviewOutcome.AGAIN);
+            break;
+          case 'Digit2':
+          case 'Numpad2':
+            event.preventDefault();
+            handleReview(ReviewOutcome.HARD);
+            break;
+          case 'Digit3':
+          case 'Numpad3':
+            event.preventDefault();
+            handleReview(ReviewOutcome.GOOD);
+            break;
+          case 'Digit4':
+          case 'Numpad4':
+            event.preventDefault();
+            handleReview(ReviewOutcome.EASY);
+            break;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showAnswer, animationState, feedbackToast, handleReview]);
 
   const handleSaveReflection = () => {
     if (currentReflectionText.trim()) {
@@ -346,7 +437,11 @@ const PracticeSessionScreen: React.FC = () => {
             <h1 className="text-2xl font-bold text-center text-slate-800 dark:text-slate-100">Sesión de Repaso</h1>
             <div className="flex justify-between items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
               <span>Tarjeta {currentCardIndex + 1} de {reviewQueue.length}</span>
-              <span>Repetición actual: {currentCard.repetitions}</span>
+              <span>Repeticiones: {currentCard.repetitions}</span>
+            </div>
+            <div className="flex justify-between items-center text-xs text-slate-400 dark:text-slate-500">
+              <span>Dificultad: {currentCard.easiness.toFixed(1)}</span>
+              <span>Último intervalo: {getTimeEstimate(currentCard.interval)}</span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mt-2">
               <div className="bg-cyan-500 dark:bg-cyan-400 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
@@ -410,15 +505,73 @@ const PracticeSessionScreen: React.FC = () => {
 
           <div className="mt-6">
             {!showAnswer && animationState === 'idle' ? (
-              <Button onClick={() => setShowAnswer(true)} className="w-full" size="lg">
-                Mostrar Respuesta
-              </Button>
+              <div className="text-center">
+                <Button onClick={() => setShowAnswer(true)} className="w-full" size="lg">
+                  Mostrar Respuesta
+                </Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  💡 Presiona Espacio o Enter para mostrar la respuesta
+                </p>
+              </div>
             ) : showAnswer && animationState === 'idle' && !feedbackToast ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Button onClick={() => handleReview(ReviewOutcome.AGAIN)} className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800" size="md">No recuerdo</Button>
-                <Button onClick={() => handleReview(ReviewOutcome.HARD)} className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700" size="md">Difícil</Button>
-                <Button onClick={() => handleReview(ReviewOutcome.GOOD)} className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800" size="md">Bien</Button>
-                <Button onClick={() => handleReview(ReviewOutcome.EASY)} className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700" size="md">Fácil</Button>
+              <div className="space-y-3">
+                <p className="text-center text-sm text-slate-600 dark:text-slate-300 mb-4">
+                  ¿Qué tan bien recordaste esta tarjeta?
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    onClick={() => handleReview(ReviewOutcome.AGAIN)} 
+                    className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 text-left p-4 h-auto flex flex-col items-start" 
+                    size="md"
+                  >
+                    <span className="font-semibold">❌ Otra vez</span>
+                    <span className="text-xs opacity-90 mt-1">
+                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.AGAIN))}
+                    </span>
+                    <span className="text-xs opacity-75 mt-0.5">Tecla: 1</span>
+                  </Button>
+                  <Button 
+                    onClick={() => handleReview(ReviewOutcome.HARD)} 
+                    className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700 text-left p-4 h-auto flex flex-col items-start" 
+                    size="md"
+                  >
+                    <span className="font-semibold">⚠️ Difícil</span>
+                    <span className="text-xs opacity-90 mt-1">
+                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.HARD))}
+                    </span>
+                    <span className="text-xs opacity-75 mt-0.5">Tecla: 2</span>
+                  </Button>
+                  <Button 
+                    onClick={() => handleReview(ReviewOutcome.GOOD)} 
+                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 text-left p-4 h-auto flex flex-col items-start" 
+                    size="md"
+                  >
+                    <span className="font-semibold">✅ Bien</span>
+                    <span className="text-xs opacity-90 mt-1">
+                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.GOOD))}
+                    </span>
+                    <span className="text-xs opacity-75 mt-0.5">Tecla: 3</span>
+                  </Button>
+                  <Button 
+                    onClick={() => handleReview(ReviewOutcome.EASY)} 
+                    className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700 text-left p-4 h-auto flex flex-col items-start" 
+                    size="md"
+                  >
+                    <span className="font-semibold">🎉 Fácil</span>
+                    <span className="text-xs opacity-90 mt-1">
+                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.EASY))}
+                    </span>
+                    <span className="text-xs opacity-75 mt-0.5">Tecla: 4</span>
+                  </Button>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                    💡 Sé honesto: evaluaciones precisas = mejor aprendizaje a largo plazo
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    ⌨️ Usa las teclas 1-4 para responder rápidamente
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="h-[52px]"> {/* Placeholder to maintain layout height */} </div>
