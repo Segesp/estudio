@@ -5,7 +5,9 @@ import Card from '../components/Card';
 import IntelligentEventModal from '../components/IntelligentEventModal';
 import CalendarFilters from '../components/CalendarFilters';
 import CalendarAnalyticsModal from '../components/CalendarAnalyticsModal';
+import NotificationCenter from '../components/NotificationCenter';
 import useLocalStorage from '../hooks/useLocalStorage';
+import useSmartNotifications from '../hooks/useSmartNotifications';
 import { ScheduledEvent, Flashcard, Deck } from '../types';
 import { 
   generateSpacedRepetitionEvents, 
@@ -14,12 +16,6 @@ import {
   generateStudyRecommendations,
   TECHNIQUE_DEFAULTS
 } from '../utils/intelligentScheduler';
-import { 
-  generateEventNotifications, 
-  generateSmartRecommendations,
-  notificationManager,
-  StudyNotification
-} from '../utils/notificationSystem';
 
 const CalendarScreen: React.FC = () => {
   const [events, setEvents] = useLocalStorage<ScheduledEvent[]>('calendar-events', []);
@@ -31,8 +27,21 @@ const CalendarScreen: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ScheduledEvent | null>(null);
-  const [notifications, setNotifications] = useState<StudyNotification[]>([]);
   const [showSmartRecommendations, setShowSmartRecommendations] = useState(false);
+
+  // Hook de notificaciones inteligentes
+  const {
+    notifications,
+    settings: notificationSettings,
+    activeNotifications,
+    hasPermission,
+    updateSettings: updateNotificationSettings,
+    dismissNotification,
+    dismissAllNotifications,
+    refreshNotifications,
+    requestPermission,
+    unreadCount
+  } = useSmartNotifications(events);
 
   // Usar eventos filtrados o todos los eventos
   const displayEvents = filteredEvents.length > 0 ? filteredEvents : events;
@@ -53,21 +62,6 @@ const CalendarScreen: React.FC = () => {
       }
     }
   }, [flashcards, setEvents]);
-
-  // Generar y programar notificaciones
-  useEffect(() => {
-    const eventNotifications = generateEventNotifications(events);
-    const smartRecommendations = generateSmartRecommendations(events, events.filter(e => e.completed));
-    const allNotifications = [...eventNotifications, ...smartRecommendations];
-    
-    setNotifications(allNotifications);
-    notificationManager.scheduleNotifications(allNotifications);
-    
-    return () => {
-      // Limpiar notificaciones al desmontar
-      notificationManager.clearAll();
-    };
-  }, [events]);
 
   // Detectar conflictos de horario
   const scheduleConflicts = useMemo(() => {
@@ -333,21 +327,17 @@ const CalendarScreen: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Calendario Inteligente</h1>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Notificaciones activas */}
-          {notifications.length > 0 && (
-            <div className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowSmartRecommendations(!showSmartRecommendations)}
-                leftIcon={<BellIcon className="w-4 h-4" />}
-              >
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1">
-                  {notifications.filter(n => !n.dismissed).length}
-                </span>
-              </Button>
-            </div>
-          )}
+          {/* Centro de notificaciones inteligentes */}
+          <NotificationCenter
+            notifications={activeNotifications}
+            settings={notificationSettings}
+            unreadCount={unreadCount}
+            hasPermission={hasPermission}
+            onDismiss={dismissNotification}
+            onDismissAll={dismissAllNotifications}
+            onRequestPermission={requestPermission}
+            onUpdateSettings={updateNotificationSettings}
+          />
           
           {/* Generar eventos automáticos */}
           <Button
@@ -370,59 +360,6 @@ const CalendarScreen: React.FC = () => {
           </Button>
         </div>
       </header>
-
-      {/* Panel de notificaciones/recomendaciones */}
-      {showSmartRecommendations && notifications.length > 0 && (
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-              🔔 Notificaciones y Recomendaciones
-            </h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowSmartRecommendations(false)}
-              leftIcon={<XMarkIcon className="w-4 h-4" />}
-            >
-            </Button>
-          </div>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {notifications.filter(n => !n.dismissed).slice(0, 5).map(notification => (
-              <div
-                key={notification.id}
-                className={`p-3 rounded-lg text-sm ${
-                  notification.priority === 'high' ? 'bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500' :
-                  notification.priority === 'medium' ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500' :
-                  'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="font-medium text-slate-700 dark:text-slate-200">
-                      {notification.title}
-                    </h4>
-                    <p className="text-slate-600 dark:text-slate-300 mt-1">
-                      {notification.message}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      notificationManager.dismissNotification(notification.id);
-                      setNotifications(prev => 
-                        prev.map(n => n.id === notification.id ? { ...n, dismissed: true } : n)
-                      );
-                    }}
-                    leftIcon={<XMarkIcon className="w-3 h-3" />}
-                  >
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {/* Conflictos de horario */}
       {scheduleConflicts.conflicts.length > 0 && (

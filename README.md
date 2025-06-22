@@ -1,4 +1,4 @@
-# EstudioPro: Optimizador Académico
+# Sense: Optimizador Académico
 
 Una aplicación web inteligente para estudiantes universitarios, diseñada para organizar el estudio y aplicar técnicas de aprendizaje basadas en la evidencia científica.
 

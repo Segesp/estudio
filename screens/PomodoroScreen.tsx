@@ -3,40 +3,78 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useLocalStorage from '../hooks/useLocalStorage';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import Modal from '../components/Modal'; // Import Modal
+import Modal from '../components/Modal';
 import { TimerIcon } from '../ui-assets';
 import { PomodoroSettings, SessionReflection } from '../types';
-import useNotifications from '../hooks/useNotifications'; // Import the hook
+import { 
+  createPomodoroStartNotification, 
+  createPomodoroBreakNotification, 
+  createPomodoroWorkNotification,
+  showBrowserNotification 
+} from '../utils/notificationSystem';
 
-type TimerMode = 'work' | 'shortBreak';
+type TimerMode = 'work' | 'shortBreak' | 'longBreak';
 
 const DEFAULT_SETTINGS: PomodoroSettings = {
   workMinutes: 25,
   shortBreakMinutes: 5,
-  longBreakMinutes: 15, // Not used in this iteration
-  sessionsBeforeLongBreak: 4, // Not used in this iteration
+  longBreakMinutes: 15,
+  sessionsBeforeLongBreak: 4,
 };
 
 const PomodoroScreen: React.FC = () => {
   const [settings, setSettings] = useLocalStorage<PomodoroSettings>('pomodoro-settings', DEFAULT_SETTINGS);
-  const [, setSessionReflections] = useLocalStorage<SessionReflection[]>('sessionReflections', []);
+  const [sessionReflections, setSessionReflections] = useLocalStorage<SessionReflection[]>('sessionReflections', []);
   const [mode, setMode] = useState<TimerMode>('work');
   const [timeLeft, setTimeLeft] = useState(settings.workMinutes * 60);
   const [isActive, setIsActive] = useState(false);
-  const [sessionCount, setSessionCount] = useState(0); 
+  const [sessionCount, setSessionCount] = useState(0);
+  const [completedSessions, setCompletedSessions] = useState(0);
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
 
   const [isReflectionModalOpen, setIsReflectionModalOpen] = useState(false);
   const [currentReflectionText, setCurrentReflectionText] = useState('');
 
-  const { showNotification, requestPermission, permission } = useNotifications(); // Use the hook
-
-  // Request permission when component mounts, if not already granted or denied
+  // Verificar permisos de notificación
   useEffect(() => {
-    if (permission === 'default') {
-      // Optionally prompt user or just wait for first notification attempt
-      // For now, let showNotification handle implicit request
+    if ('Notification' in window) {
+      setHasNotificationPermission(Notification.permission === 'granted');
     }
-  }, [permission, requestPermission]);
+  }, []);
+
+  // Solicitar permisos de notificación
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      const permission = await Notification.requestPermission();
+      setHasNotificationPermission(permission === 'granted');
+    }
+  };
+
+  // Mostrar notificación
+  const showNotification = (title: string, body: string) => {
+    if (hasNotificationPermission) {
+      new Notification(title, {
+        body,
+        icon: '/favicon.ico',
+        badge: '/favicon.ico'
+      });
+    }
+  };
+
+  // Mostrar notificación inteligente
+  const showSmartNotification = (sessionNumber?: number, totalSessions?: number, isBreak = false, isLongBreak = false) => {
+    let notification;
+    
+    if (isBreak) {
+      notification = createPomodoroBreakNotification(isLongBreak, isLongBreak ? settings.longBreakMinutes : settings.shortBreakMinutes);
+    } else if (sessionNumber) {
+      notification = createPomodoroStartNotification(sessionNumber, totalSessions || settings.sessionsBeforeLongBreak, settings.workMinutes);
+    } else {
+      notification = createPomodoroWorkNotification(settings.workMinutes);
+    }
+    
+    showBrowserNotification(notification);
+  };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -44,33 +82,33 @@ const PomodoroScreen: React.FC = () => {
     return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
   
-  const switchModeAndReset = useCallback((nextMode: TimerMode) => {
-    setMode(nextMode);
-    if (nextMode === 'work') {
-      setTimeLeft(settings.workMinutes * 60);
-    } else {
-      setTimeLeft(settings.shortBreakMinutes * 60);
+  const getTimeForMode = useCallback((currentMode: TimerMode): number => {
+    switch (currentMode) {
+      case 'work': return settings.workMinutes * 60;
+      case 'shortBreak': return settings.shortBreakMinutes * 60;
+      case 'longBreak': return settings.longBreakMinutes * 60;
+      default: return settings.workMinutes * 60;
     }
   }, [settings]);
 
+  const switchModeAndReset = useCallback((nextMode: TimerMode) => {
+    setMode(nextMode);
+    setTimeLeft(getTimeForMode(nextMode));
+    setIsActive(false);
+  }, [getTimeForMode]);
+
   const resetTimer = useCallback(() => {
     setIsActive(false);
-    if (mode === 'work') {
-      setTimeLeft(settings.workMinutes * 60);
-    } else {
-      setTimeLeft(settings.shortBreakMinutes * 60);
-    }
-  }, [mode, settings]);
+    setTimeLeft(getTimeForMode(mode));
+  }, [mode, getTimeForMode]);
   
+  // Solo reinicia automáticamente cuando cambian los settings o el modo, no cuando se pausa
   useEffect(() => {
-    if (!isActive) {
-        resetTimer();
-    }
-  }, [settings, mode, isActive, resetTimer]);
-
+    setTimeLeft(getTimeForMode(mode));
+  }, [settings, mode, getTimeForMode]);
 
   useEffect(() => {
-    let interval: number | undefined = undefined;
+    let interval: NodeJS.Timeout | undefined = undefined;
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
@@ -79,21 +117,28 @@ const PomodoroScreen: React.FC = () => {
     } else if (isActive && timeLeft === 0) {
       setIsActive(false);
       
-      const notificationTitle = mode === 'work' ? "Pomodoro: ¡Tiempo de descanso!" : "Pomodoro: ¡A trabajar!";
-      const notificationBody = mode === 'work' 
-        ? `Has completado una sesión de enfoque. Tómate ${settings.shortBreakMinutes} minutos.`
-        : `El descanso ha terminado. ¡Es hora de enfocarse durante ${settings.workMinutes} minutos!`;
-      showNotification(notificationTitle, { body: notificationBody, icon: '/icon-192.png' }); // Assuming you have an icon
-      
       if (mode === 'work') {
-        setIsReflectionModalOpen(true); 
-      } else { // break ended
+        const newCompletedSessions = completedSessions + 1;
+        setCompletedSessions(newCompletedSessions);
+        
+        // Determinar si es descanso largo o corto
+        const isLongBreak = newCompletedSessions % settings.sessionsBeforeLongBreak === 0;
+        
+        showSmartNotification(newCompletedSessions, settings.sessionsBeforeLongBreak, true, isLongBreak);
+        
+        setIsReflectionModalOpen(true);
+        setSessionCount(prev => prev + 1);
+      } else {
+        // Fin del descanso
+        showSmartNotification();
         switchModeAndReset('work');
       }
     }
 
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft, mode, switchModeAndReset, settings, showNotification]);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, timeLeft, mode, completedSessions, settings, switchModeAndReset]);
 
   const handleSaveReflectionAndSwitchMode = () => {
     if (currentReflectionText.trim()) {
@@ -108,15 +153,15 @@ const PomodoroScreen: React.FC = () => {
     setIsReflectionModalOpen(false);
     setCurrentReflectionText('');
     
-    setSessionCount(prev => prev + 1);
-    switchModeAndReset('shortBreak');
+    // Determinar el próximo modo basado en sesiones completadas
+    const isLongBreak = completedSessions % settings.sessionsBeforeLongBreak === 0;
+    switchModeAndReset(isLongBreak ? 'longBreak' : 'shortBreak');
   };
 
-
-  const toggleTimer = () => {
-    // Request permission on first start if not already decided
-    if (!isActive && permission === 'default') {
-        requestPermission();
+  const toggleTimer = async () => {
+    // Solicitar permisos si es la primera vez
+    if (!isActive && !hasNotificationPermission) {
+      await requestNotificationPermission();
     }
     setIsActive(!isActive);
   };
@@ -124,12 +169,32 @@ const PomodoroScreen: React.FC = () => {
   const handleSkip = () => {
     setIsActive(false);
     if (mode === 'work') {
-       setIsReflectionModalOpen(true); 
+      setIsReflectionModalOpen(true);
+      setSessionCount(prev => prev + 1);
+      setCompletedSessions(prev => prev + 1);
     } else {
-       switchModeAndReset('work');
+      switchModeAndReset('work');
     }
   };
   
+  const getModeText = (currentMode: TimerMode): string => {
+    switch (currentMode) {
+      case 'work': return '🍅 Enfócate';
+      case 'shortBreak': return '☕ Descanso Corto';
+      case 'longBreak': return '🌿 Descanso Largo';
+      default: return '🍅 Enfócate';
+    }
+  };
+
+  const getModeColor = (currentMode: TimerMode): string => {
+    switch (currentMode) {
+      case 'work': return 'bg-rose-500 dark:bg-rose-600';
+      case 'shortBreak': return 'bg-emerald-500 dark:bg-emerald-600';
+      case 'longBreak': return 'bg-blue-500 dark:bg-blue-600';
+      default: return 'bg-rose-500 dark:bg-rose-600';
+    }
+  };
+
   const handleSettingsChange = (field: keyof PomodoroSettings, value: string) => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0 && numValue <= 120) { 
@@ -137,8 +202,8 @@ const PomodoroScreen: React.FC = () => {
     }
   };
 
-  const currentPhaseText = mode === 'work' ? 'Enfócate' : 'Descanso Corto';
-  const phaseColor = mode === 'work' ? 'bg-rose-500 dark:bg-rose-600' : 'bg-emerald-500 dark:bg-emerald-600';
+  const currentPhaseText = getModeText(mode);
+  const phaseColor = getModeColor(mode);
 
   return (
     <div className="p-4 flex flex-col items-center space-y-6 h-[calc(100vh-120px)] sm:h-auto justify-center">
@@ -198,11 +263,23 @@ const PomodoroScreen: React.FC = () => {
             </div>
         </div>
       </Card>
-       <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Sesiones de enfoque completadas: {sessionCount}</p>
-       {permission === 'denied' && (
-         <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
-           Las notificaciones están bloqueadas. Habilítalas en los ajustes de tu navegador para recibir alertas.
-         </p>
+       <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
+         Sesiones completadas: {completedSessions} | Actual: {sessionCount}
+       </p>
+       {!hasNotificationPermission && (
+         <div className="text-center">
+           <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">
+             Las notificaciones están deshabilitadas. Habilítalas para recibir alertas.
+           </p>
+           <Button
+             variant="ghost"
+             size="sm"
+             onClick={requestNotificationPermission}
+             className="text-xs"
+           >
+             Activar Notificaciones
+           </Button>
+         </div>
        )}
 
 

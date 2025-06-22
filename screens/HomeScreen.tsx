@@ -32,7 +32,7 @@ const HomeScreen: React.FC = () => {
   return (
     <div className="p-4 space-y-6">
       <header className="text-center py-6">
-        <AcademicCapIcon className="w-16 h-16 mx-auto text-cyan-500 dark:text-cyan-400 mb-2" />
+        <div className="text-6xl mb-2">🧠</div>
         <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{APP_NAME}</h1>
         <p className="text-slate-600 dark:text-slate-300 mt-1">Tu compañero inteligente para el éxito académico.</p>
       </header>
@@ -57,7 +57,7 @@ const HomeScreen: React.FC = () => {
         <div className="flex justify-between items-center mb-3">
             <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Tu Agenda de Hoy</h3>
             <Link to="/schedule">
-                <Button variant="ghost" size="sm" rightIcon={<CalendarDaysIcon className="w-4 h-4"/>}>
+                <Button variant="ghost" size="sm" rightIcon={<span className="text-lg">📅</span>}>
                     Ver Agenda Completa
                 </Button>
             </Link>
@@ -76,7 +76,7 @@ const HomeScreen: React.FC = () => {
           </div>
         ) : (
           <Card className="text-center py-6 dark:bg-slate-800">
-            <CalendarDaysIcon className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+            <div className="text-4xl mb-2">📅</div>
             <p className="text-slate-500 dark:text-slate-400">No tienes eventos agendados para hoy.</p>
             <Link to="/schedule">
                  <Button variant="secondary" size="sm" className="mt-3">Agendar Algo</Button>
@@ -91,28 +91,28 @@ const HomeScreen: React.FC = () => {
         <div className="grid grid-cols-2 gap-4">
           <Link to="/flashcards" aria-label="Ir a Mis Flashcards">
             <Card className="hover:border-cyan-500 dark:hover:border-cyan-400 border-2 border-transparent">
-              <RectangleStackIcon className="w-8 h-8 text-cyan-500 dark:text-cyan-400 mb-2" />
+              <div className="text-3xl mb-2">🗂️</div>
               <h4 className="font-semibold text-slate-700 dark:text-slate-200">Mis Flashcards</h4>
               <p className="text-sm text-slate-500 dark:text-slate-400">Crea y repasa tus tarjetas.</p>
             </Card>
           </Link>
           <Link to="/goals" aria-label="Ir a Mis Metas">
             <Card className="hover:border-emerald-500 dark:hover:border-emerald-400 border-2 border-transparent">
-              <CheckCircleIcon className="w-8 h-8 text-emerald-500 dark:text-emerald-400 mb-2" />
+              <div className="text-3xl mb-2">🎯</div>
               <h4 className="font-semibold text-slate-700 dark:text-slate-200">Mis Metas</h4>
               <p className="text-sm text-slate-500 dark:text-slate-400">Define y sigue tus objetivos.</p>
             </Card>
           </Link>
           <Link to="/strategies" aria-label="Ir a Estrategias">
             <Card className="hover:border-violet-500 dark:hover:border-violet-400 border-2 border-transparent">
-               <BookOpenIcon className="w-8 h-8 text-violet-500 dark:text-violet-400 mb-2" />
+               <div className="text-3xl mb-2">🧠</div>
               <h4 className="font-semibold text-slate-700 dark:text-slate-200">Estrategias</h4>
               <p className="text-sm text-slate-500 dark:text-slate-400">Aprende técnicas efectivas.</p>
             </Card>
           </Link>
            <Link to="/pomodoro" aria-label="Ir a Temporizador Pomodoro">
             <Card className="hover:border-amber-500 dark:hover:border-amber-400 border-2 border-transparent">
-               <TimerIcon className="w-8 h-8 text-amber-500 dark:text-amber-400 mb-2" />
+               <div className="text-3xl mb-2">🍅</div>
               <h4 className="font-semibold text-slate-700 dark:text-slate-200">Pomodoro</h4>
               <p className="text-sm text-slate-500 dark:text-slate-400">Sesiones de estudio.</p>
             </Card>
@@ -129,7 +129,7 @@ const HomeScreen: React.FC = () => {
       </div>
        <div className="text-center mt-4">
         <Link to="/wellbeing">
-            <Button variant='ghost' size='sm' rightIcon={<SparklesIcon className="w-4 h-4" />}>
+            <Button variant='ghost' size='sm' rightIcon={<span className="text-lg">✨</span>}>
                 Consejos de Bienestar
             </Button>
         </Link>

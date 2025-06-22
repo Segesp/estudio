@@ -37,3 +37,30 @@ body {
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #475569; /* dark:bg-slate-600 */
 }
+
+/* Pomodoro input styles */
+.pomodoro-input {
+  width: 60px;
+  padding: 8px;
+  border: 1px solid;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+.dark .pomodoro-input {
+  background-color: #334155; /* dark:bg-slate-700 */
+}
+
+.pomodoro-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.5);
+}
+
+.pomodoro-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

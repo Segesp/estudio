@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
@@ -11,6 +10,7 @@ import WellbeingScreen from './screens/WellbeingScreen';
 import PomodoroScreen from './screens/PomodoroScreen';
 import CalendarScreen from './screens/CalendarScreen';
 import SettingsModal from './components/SettingsModal';
+import NotificationCenter from './components/NotificationCenter';
 import ReflectionsScreen from './screens/ReflectionsScreen'; 
 import ElaborationScreen from './screens/ElaborationScreen';
 import InterleavingScreen from './screens/InterleavingScreen';
@@ -18,6 +18,7 @@ import DrawingScreen from './screens/DrawingScreen';
 import ScheduleScreen from './screens/ScheduleScreen'; // Import ScheduleScreen
 import TestScreen from './screens/TestScreen'; // Import TestScreen
 import useDarkMode from './hooks/useDarkMode';
+import useSmartNotifications from './hooks/useSmartNotifications';
 import { Theme } from './types';
 
 
@@ -25,6 +26,19 @@ const App: React.FC = () => {
   const location = useLocation();
   const [theme, setTheme] = useDarkMode();
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  
+  // Initialize smart notifications with empty events array (will be updated from individual components)
+  const {
+    notifications,
+    settings: notificationSettings,
+    activeNotifications,
+    unreadCount,
+    hasPermission,
+    requestPermission,
+    dismissNotification,
+    dismissAllNotifications,
+    updateSettings
+  } = useSmartNotifications([]);
   
   const showBottomNavPaths = [
     "/", 
@@ -69,6 +83,16 @@ const App: React.FC = () => {
         </Routes>
       </main>
       {showBottomNav && <BottomNav onSettingsClick={toggleSettingsModal} />}
+      <NotificationCenter 
+        notifications={activeNotifications}
+        settings={notificationSettings}
+        unreadCount={unreadCount}
+        hasPermission={hasPermission}
+        onRequestPermission={requestPermission}
+        onDismiss={dismissNotification}
+        onDismissAll={dismissAllNotifications}
+        onUpdateSettings={updateSettings}
+      />
       <SettingsModal 
         isOpen={isSettingsModalOpen}
         onClose={toggleSettingsModal}

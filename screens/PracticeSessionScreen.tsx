@@ -5,7 +5,6 @@ import useLocalStorage from '../hooks/useLocalStorage';
 import { Flashcard, ReviewOutcome, SessionReflection } from '../types';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
-import useNotifications from '../hooks/useNotifications'; // Import the hook
 
 const DEFAULT_DECK_ID = 'default-deck';
 
@@ -130,7 +129,6 @@ const PracticeSessionScreen = () => {
   const [currentReflectionText, setCurrentReflectionText] = useState('');
   const [animationState, setAnimationState] = useState<'idle' | 'sliding-out' | 'sliding-in'>('idle');
   
-  const { showNotification, permission, requestPermission } = useNotifications();
   const navigate = useNavigate();
 
   // Check if session should continue (any cards still in learning or due within next hour)
@@ -171,19 +169,7 @@ const PracticeSessionScreen = () => {
     setFeedbackToast(null);
     setElaborationInputText(cardsToReview[0]?.lastElaboration || '');
     setAnimationState('idle');
-
-    if (cardsToReview.length > 0) {
-      if (permission === 'default') {
-        requestPermission().then(currentPerm => {
-          if (currentPerm === 'granted') {
-             showNotification("EstudioPro: Repaso Pendiente", { body: `Tienes ${cardsToReview.length} flashcards para repasar hoy.`, icon: '/icon-192.png' });
-          }
-        });
-      } else if (permission === 'granted') {
-        showNotification("EstudioPro: Repaso Pendiente", { body: `Tienes ${cardsToReview.length} flashcards para repasar hoy.`, icon: '/icon-192.png' });
-      }
-    }
-  }, [allFlashcards, permission, requestPermission, showNotification, shouldContinueSession]);
+  }, [allFlashcards, shouldContinueSession]);
 
   // Auto-refresh queue every 30 seconds to catch cards that become due
   useEffect(() => {
