@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { usePersistentSettings } from '../hooks/storage/usePersistentStore';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
@@ -23,17 +23,59 @@ const DEFAULT_SETTINGS: PomodoroSettings = {
 };
 
 const PomodoroScreen: React.FC = () => {
-  const [settings, setSettings] = useLocalStorage<PomodoroSettings>('pomodoro-settings', DEFAULT_SETTINGS);
-  const [sessionReflections, setSessionReflections] = useLocalStorage<SessionReflection[]>('sessionReflections', []);
+  const { getSetting, setSetting } = usePersistentSettings();
+  
+  const [settings, setSettingsState] = useState<PomodoroSettings>(DEFAULT_SETTINGS);
+  const [sessionReflections, setSessionReflectionsState] = useState<SessionReflection[]>([]);
   const [mode, setMode] = useState<TimerMode>('work');
-  const [timeLeft, setTimeLeft] = useState(settings.workMinutes * 60);
+  const [timeLeft, setTimeLeft] = useState(DEFAULT_SETTINGS.workMinutes * 60); // Usar DEFAULT_SETTINGS inicialmente
   const [isActive, setIsActive] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const [completedSessions, setCompletedSessions] = useState(0);
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false); // Nuevo estado para tracking
 
   const [isReflectionModalOpen, setIsReflectionModalOpen] = useState(false);
   const [currentReflectionText, setCurrentReflectionText] = useState('');
+
+  // Cargar configuraciones desde almacenamiento persistente
+  useEffect(() => {
+    const loadSettings = async () => {
+      console.log('PomodoroScreen: Loading settings...');
+      const savedSettings = await getSetting<PomodoroSettings>('pomodoro-settings');
+      if (savedSettings) {
+        console.log('PomodoroScreen: Loaded settings:', savedSettings);
+        setSettingsState(savedSettings);
+        setTimeLeft(savedSettings.workMinutes * 60); // Actualizar timeLeft con configuraciones cargadas
+      } else {
+        console.log('PomodoroScreen: Using default settings');
+        setTimeLeft(DEFAULT_SETTINGS.workMinutes * 60);
+      }
+      
+      const savedReflections = await getSetting<SessionReflection[]>('sessionReflections');
+      if (savedReflections) {
+        setSessionReflectionsState(savedReflections);
+      }
+      
+      setSettingsLoaded(true);
+    };
+    
+    loadSettings();
+  }, [getSetting]);
+
+  // Guardar configuraciones cuando cambien
+  const setSettings = useCallback(async (newSettings: PomodoroSettings | ((prev: PomodoroSettings) => PomodoroSettings)) => {
+    const updatedSettings = typeof newSettings === 'function' ? newSettings(settings) : newSettings;
+    setSettingsState(updatedSettings);
+    await setSetting('pomodoro-settings', updatedSettings);
+  }, [settings, setSetting]);
+
+  // Guardar reflexiones cuando cambien
+  const setSessionReflections = useCallback(async (newReflections: SessionReflection[] | ((prev: SessionReflection[]) => SessionReflection[])) => {
+    const updatedReflections = typeof newReflections === 'function' ? newReflections(sessionReflections) : newReflections;
+    setSessionReflectionsState(updatedReflections);
+    await setSetting('sessionReflections', updatedReflections);
+  }, [sessionReflections, setSetting]);
 
   // Verificar permisos de notificación
   useEffect(() => {
@@ -98,23 +140,35 @@ const PomodoroScreen: React.FC = () => {
   }, [getTimeForMode]);
 
   const resetTimer = useCallback(() => {
+    console.log('PomodoroScreen: resetTimer called');
     setIsActive(false);
     setTimeLeft(getTimeForMode(mode));
   }, [mode, getTimeForMode]);
   
   // Solo reinicia automáticamente cuando cambian los settings o el modo, no cuando se pausa
   useEffect(() => {
-    setTimeLeft(getTimeForMode(mode));
-  }, [settings, mode, getTimeForMode]);
+    if (settingsLoaded) {
+      console.log('PomodoroScreen: Updating timeLeft for mode:', mode, 'with settings:', settings);
+      setTimeLeft(getTimeForMode(mode));
+    }
+  }, [settings, mode, getTimeForMode, settingsLoaded]);
 
   useEffect(() => {
+    if (!settingsLoaded) return; // No iniciar timer hasta que settings estén cargados
+    
     let interval: NodeJS.Timeout | undefined = undefined;
+
+    console.log('PomodoroScreen: Timer effect - isActive:', isActive, 'timeLeft:', timeLeft);
 
     if (isActive && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft((prevTime) => prevTime - 1);
+        setTimeLeft((prevTime) => {
+          console.log('PomodoroScreen: Timer tick, prevTime:', prevTime);
+          return prevTime - 1;
+        });
       }, 1000);
     } else if (isActive && timeLeft === 0) {
+      console.log('PomodoroScreen: Timer completed for mode:', mode);
       setIsActive(false);
       
       if (mode === 'work') {
@@ -138,9 +192,9 @@ const PomodoroScreen: React.FC = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, timeLeft, mode, completedSessions, settings, switchModeAndReset]);
+  }, [isActive, timeLeft, mode, completedSessions, settings, switchModeAndReset, settingsLoaded]);
 
-  const handleSaveReflectionAndSwitchMode = () => {
+  const handleSaveReflectionAndSwitchMode = async () => {
     if (currentReflectionText.trim()) {
       const newReflection: SessionReflection = {
         id: Date.now().toString(),
@@ -148,7 +202,7 @@ const PomodoroScreen: React.FC = () => {
         text: currentReflectionText.trim(),
         sessionType: 'pomodoro',
       };
-      setSessionReflections(prev => [newReflection, ...prev]);
+      await setSessionReflections(prev => [newReflection, ...prev]);
     }
     setIsReflectionModalOpen(false);
     setCurrentReflectionText('');
@@ -159,14 +213,17 @@ const PomodoroScreen: React.FC = () => {
   };
 
   const toggleTimer = async () => {
+    console.log('PomodoroScreen: toggleTimer called, current isActive:', isActive);
     // Solicitar permisos si es la primera vez
     if (!isActive && !hasNotificationPermission) {
       await requestNotificationPermission();
     }
     setIsActive(!isActive);
+    console.log('PomodoroScreen: isActive will be:', !isActive);
   };
 
   const handleSkip = () => {
+    console.log('PomodoroScreen: handleSkip called, current mode:', mode);
     setIsActive(false);
     if (mode === 'work') {
       setIsReflectionModalOpen(true);
@@ -195,15 +252,27 @@ const PomodoroScreen: React.FC = () => {
     }
   };
 
-  const handleSettingsChange = (field: keyof PomodoroSettings, value: string) => {
+  const handleSettingsChange = async (field: keyof PomodoroSettings, value: string) => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue) && numValue > 0 && numValue <= 120) { 
-        setSettings(prev => ({...prev, [field]: numValue }));
+      await setSettings(prev => ({...prev, [field]: numValue }));
     }
   };
 
   const currentPhaseText = getModeText(mode);
   const phaseColor = getModeColor(mode);
+
+  // Mostrar loading hasta que las configuraciones se carguen
+  if (!settingsLoaded) {
+    return (
+      <div className="p-4 flex flex-col items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500 mx-auto mb-2"></div>
+          <p className="text-slate-600 dark:text-slate-400">Cargando configuraciones...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 flex flex-col items-center space-y-6 h-[calc(100vh-120px)] sm:h-auto justify-center">
@@ -222,14 +291,30 @@ const PomodoroScreen: React.FC = () => {
             </p>
         </div>
         <div className="grid grid-cols-2 gap-2 px-4 pb-4">
-          <Button onClick={toggleTimer} variant={isActive ? 'secondary' : 'primary'} size="lg" className="w-full" disabled={isReflectionModalOpen}>
+          <Button 
+            onClick={toggleTimer} 
+            variant={isActive ? 'secondary' : 'primary'} 
+            size="lg" 
+            className="w-full"
+          >
             {isActive ? 'Pausar' : 'Iniciar'}
           </Button>
-          <Button onClick={resetTimer} variant="ghost" size="lg" className="w-full" disabled={isActive || isReflectionModalOpen}>
+          <Button 
+            onClick={resetTimer} 
+            variant="ghost" 
+            size="lg" 
+            className="w-full" 
+            disabled={isActive}
+          >
             Reiniciar
           </Button>
         </div>
-         <Button onClick={handleSkip} variant="ghost" size="sm" className="w-full text-sm text-slate-500 dark:text-slate-400 mt-2" disabled={isReflectionModalOpen || isActive && timeLeft === 0}>
+         <Button 
+           onClick={handleSkip} 
+           variant="ghost" 
+           size="sm" 
+           className="w-full text-sm text-slate-500 dark:text-slate-400 mt-2"
+         >
             Saltar {mode === 'work' ? 'Enfoque' : 'Descanso'}
         </Button>
       </Card>

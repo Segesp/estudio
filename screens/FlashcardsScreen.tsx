@@ -58,6 +58,74 @@ const FlashcardsScreen: React.FC = () => {
     setSetting('flashcard-decks', decks);
   }, [decks, setSetting]);
 
+  // Crear flashcards de ejemplo para testing si no existen
+  useEffect(() => {
+    const createExampleCards = async () => {
+      if (flashcards.length === 0 && !loading) {
+        console.log('Creating example flashcards for testing...');
+        
+        const exampleCards = [
+          {
+            front: "¿Qué es la fotosíntesis?",
+            back: "Proceso por el cual las plantas convierten la luz solar, agua y CO2 en glucosa y oxígeno",
+            deckId: DEFAULT_DECK_ID,
+            lastReviewed: null,
+            nextReviewDate: new Date().toISOString().split('T')[0], // Hoy
+            tags: ['biología', 'plantas'],
+            qualityHistory: [],
+            easiness: 2.5,
+            repetitions: 0,
+            interval: 1,
+            isLearning: true,
+            currentLearningStep: 0,
+            difficulty: 'medium' as const,
+            cognitiveLevel: 'recognition' as const,
+          },
+          {
+            front: "¿Cuál es la fórmula del área de un círculo?",
+            back: "A = πr², donde r es el radio del círculo",
+            deckId: DEFAULT_DECK_ID,
+            lastReviewed: null,
+            nextReviewDate: new Date().toISOString().split('T')[0], // Hoy
+            tags: ['matemáticas', 'geometría'],
+            qualityHistory: [],
+            easiness: 2.5,
+            repetitions: 0,
+            interval: 1,
+            isLearning: true,
+            currentLearningStep: 0,
+            difficulty: 'easy' as const,
+            cognitiveLevel: 'recognition' as const,
+          },
+          {
+            front: "¿Qué significa 'Hello' en español?",
+            back: "Hola",
+            deckId: DEFAULT_DECK_ID,
+            lastReviewed: null,
+            nextReviewDate: new Date().toISOString().split('T')[0], // Hoy
+            tags: ['inglés', 'vocabulario'],
+            qualityHistory: [],
+            easiness: 2.5,
+            repetitions: 0,
+            interval: 1,
+            isLearning: true,
+            currentLearningStep: 0,
+            difficulty: 'easy' as const,
+            cognitiveLevel: 'recognition' as const,
+          }
+        ];
+        
+        for (const card of exampleCards) {
+          await createFlashcard(card);
+        }
+        
+        console.log('Example flashcards created');
+      }
+    };
+    
+    createExampleCards();
+  }, [flashcards, loading, createFlashcard]);
+
   const handleAddOrUpdateCard = async () => {
     if (!currentFront.trim() || !currentBack.trim()) {
       alert('Ambos lados de la flashcard deben tener contenido.');
@@ -264,7 +332,7 @@ const FlashcardsScreen: React.FC = () => {
             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">{deck.name}</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{cardsInDefaultDeck.length} tarjetas</p>
             <div className="flex space-x-2">
-              <Link to="/practice">
+              <Link to="/flashcards/practice">
                 <Button size="sm" variant="primary">
                   Estudiar ({pendingReviewCount} pendientes)
                 </Button>

@@ -131,30 +131,9 @@ const PracticeSessionScreen = () => {
 
   // Initialize review queue
   useEffect(() => {
-    console.log('PracticeSession: useEffect triggered');
-    console.log('Total flashcards:', flashcards.length);
-    
-    if (flashcards.length === 0) {
-      console.log('No flashcards found, returning early');
-      return;
-    }
+    if (flashcards.length === 0) return;
     
     const now = new Date();
-    console.log('Current time:', now);
-    
-    // Debug: Show all cards and their review dates
-    flashcards.forEach((fc: StoredFlashcard, index: number) => {
-      console.log(`Card ${index}:`, {
-        id: fc.id,
-        front: fc.front.substring(0, 50),
-        deckId: fc.deckId,
-        nextReviewDate: fc.nextReviewDate,
-        isLearning: fc.isLearning,
-        repetitions: fc.repetitions,
-        isDue: new Date(fc.nextReviewDate) <= now
-      });
-    });
-    
     const cardsToReview = flashcards
       .filter((fc: StoredFlashcard) => 
         fc.deckId === DEFAULT_DECK_ID && 
@@ -168,9 +147,6 @@ const PracticeSessionScreen = () => {
         if (!aIsLearning && bIsLearning) return 1;
         return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
       });
-    
-    console.log('Cards to review:', cardsToReview.length);
-    console.log('Review queue:', cardsToReview);
     
     setReviewQueue(cardsToReview);
     setCurrentCardIndex(0);
@@ -301,10 +277,11 @@ const PracticeSessionScreen = () => {
     if (currentReflectionText.trim()) {
       const reflections = await getSetting<SessionReflection[]>('sessionReflections') || [];
       const newReflection: SessionReflection = {
-        id: Date.now().toString(),
+        id: Date.now(),
         text: currentReflectionText.trim(),
         date: new Date().toISOString(),
-        sessionType: 'practice' as any // Assuming this field exists in SessionType
+        cardsReviewed: currentCardIndex,
+        sessionDurationMinutes: 0 // Could track this if needed
       };
       
       await setSetting('sessionReflections', [newReflection, ...reflections]);
@@ -347,7 +324,6 @@ const PracticeSessionScreen = () => {
   const currentCard = reviewQueue[currentCardIndex];
 
   if (loading) {
-    console.log('PracticeSession: Still loading...');
     return (
       <div className="p-4 flex items-center justify-center h-64">
         <div className="text-center">
@@ -359,7 +335,6 @@ const PracticeSessionScreen = () => {
   }
 
   if (error) {
-    console.log('PracticeSession: Error state:', error);
     return (
       <div className="p-4 flex items-center justify-center h-64">
         <div className="text-center">
@@ -371,7 +346,6 @@ const PracticeSessionScreen = () => {
   }
 
   if (reviewQueue.length === 0) {
-    console.log('PracticeSession: No cards in review queue');
     return (
       <div className="p-4 flex items-center justify-center h-64">
         <div className="text-center">
@@ -383,8 +357,6 @@ const PracticeSessionScreen = () => {
       </div>
     );
   }
-
-  console.log('PracticeSession: Rendering practice session with card:', currentCard);
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
