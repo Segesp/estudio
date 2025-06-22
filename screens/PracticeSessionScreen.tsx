@@ -443,6 +443,10 @@ const PracticeSessionScreen = () => {
               <span>Dificultad: {currentCard.easiness.toFixed(1)}</span>
               <span>Último intervalo: {getTimeEstimate(currentCard.interval)}</span>
             </div>
+            {/* Debug info - remove in production */}
+            <div className="text-xs text-orange-500 text-center mt-1">
+              Estado: {showAnswer ? 'Respuesta visible' : 'Pregunta visible'} | Animación: {animationState} | Feedback: {feedbackToast ? 'Sí' : 'No'}
+            </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mt-2">
               <div className="bg-cyan-500 dark:bg-cyan-400 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
             </div>
@@ -573,8 +577,25 @@ const PracticeSessionScreen = () => {
                   </p>
                 </div>
               </div>
+            ) : feedbackToast ? (
+              <div className="text-center">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Procesando respuesta...
+                </p>
+              </div>
             ) : (
-              <div className="h-[52px]"> {/* Placeholder to maintain layout height */} </div>
+              <div className="text-center">
+                <Button 
+                  onClick={() => setShowAnswer(true)} 
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" 
+                  size="lg"
+                >
+                  Continuar
+                </Button>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  Parece que hay un problema. Haz clic para continuar.
+                </p>
+              </div>
             )}
           </div>
            <Button variant="ghost" onClick={() => navigate('/flashcards')} className="w-full mt-4 text-sm dark:text-slate-400 dark:hover:text-slate-200">
