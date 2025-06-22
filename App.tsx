@@ -15,6 +15,7 @@ import ElaborationScreen from './screens/ElaborationScreen';
 import InterleavingScreen from './screens/InterleavingScreen';
 import DrawingScreen from './screens/DrawingScreen';
 import ScheduleScreen from './screens/ScheduleScreen'; // Import ScheduleScreen
+import TestScreen from './screens/TestScreen'; // Import TestScreen
 import useDarkMode from './hooks/useDarkMode';
 import { Theme } from './types';
 
@@ -61,6 +62,7 @@ const App: React.FC = () => {
           <Route path="/interleaving" element={<InterleavingScreen />} />
           <Route path="/drawing" element={<DrawingScreen />} />
           <Route path="/schedule" element={<ScheduleScreen />} /> {/* Add ScheduleScreen route */}
+          <Route path="/test" element={<TestScreen />} /> {/* Add TestScreen route */}
         </Routes>
       </main>
       {showBottomNav && <BottomNav onSettingsClick={toggleSettingsModal} />}

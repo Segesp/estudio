@@ -9,64 +9,99 @@ import useNotifications from '../hooks/useNotifications'; // Import the hook
 
 const DEFAULT_DECK_ID = 'default-deck';
 
-// Optimized SM-2 Algorithm with Enhanced Forgetting Curve Implementation
+// Enhanced Anki SM-2 Algorithm with Learning Steps and Graduation
+// Implements realistic Anki behavior with immediate reviews and learning phases
 const applySM2 = (card: Flashcard, quality: number, elaboration?: string): Flashcard => {
   let newInterval: number;
   let newRepetitions: number;
   let newEasiness = card.easiness;
+  let isLearning = false;
+  let currentLearningStep = card.currentLearningStep || 0;
 
   if (quality < 0 || quality > 5) throw new Error("Quality must be between 0 and 5");
 
-  // Enhanced failure handling - progressive penalties
-  if (quality < 3) { 
-    newRepetitions = 0; 
-    // More aggressive reset for very poor performance
-    if (quality === 0) {
-      newInterval = 1; // Again - see it again soon
-      newEasiness = Math.max(1.3, newEasiness - 0.2); // Significant penalty
-    } else if (quality === 1) {
-      newInterval = 1; // Hard - still needs immediate review
-      newEasiness = Math.max(1.3, newEasiness - 0.15);
-    } else { // quality === 2
-      newInterval = 2; // Somewhat hard
-      newEasiness = Math.max(1.3, newEasiness - 0.1);
-    }
-  } else { 
-    // Success - progressive intervals
-    newRepetitions = card.repetitions + 1;
+  // Learning steps (in minutes): 1min, 10min for new cards and lapses
+  const learningSteps = [1, 10]; // minutes
+  // Graduating interval: 1 day, Easy interval: 4 days
+  const graduatingInterval = 1; // days
+  const easyInterval = 4; // days
+
+  // Determine if card is in learning phase
+  const wasInLearning = card.repetitions === 0 || card.isLearning;
+
+  // Step 1: Handle responses
+  if (quality < 3) {
+    // Failure - reset to learning mode
+    newRepetitions = 0;
+    currentLearningStep = 0;
+    isLearning = true;
+    newInterval = learningSteps[0] / (24 * 60); // Convert minutes to days (fraction)
     
-    if (newRepetitions === 1) {
-      newInterval = quality === 5 ? 4 : 1; // Easy first time gets longer interval
-    } else if (newRepetitions === 2) {
-      newInterval = quality === 5 ? 10 : 6;
+    // Penalty for failures in mature cards
+    if (!wasInLearning) {
+      newEasiness = Math.max(1.3, newEasiness - 0.2);
+    }
+  } else {
+    // Success (q >= 3)
+    if (wasInLearning) {
+      // Card is in learning phase
+      if (quality === 5) {
+        // Easy - graduate immediately to easy interval
+        newRepetitions = 1;
+        newInterval = easyInterval;
+        isLearning = false;
+        currentLearningStep = 0;
+      } else if (currentLearningStep < learningSteps.length - 1) {
+        // Move to next learning step
+        currentLearningStep++;
+        newInterval = learningSteps[currentLearningStep] / (24 * 60);
+        newRepetitions = 0;
+        isLearning = true;
+      } else {
+        // Graduate from learning
+        newRepetitions = 1;
+        newInterval = graduatingInterval;
+        isLearning = false;
+        currentLearningStep = 0;
+      }
     } else {
-      // Enhanced interval calculation with quality bonus
-      const baseInterval = Math.round(card.interval * newEasiness);
-      const qualityMultiplier = quality === 5 ? 1.3 : (quality === 4 ? 1.0 : 0.9);
-      newInterval = Math.round(baseInterval * qualityMultiplier);
-    }
-    
-    // Improved easiness factor calculation
-    newEasiness = newEasiness + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-    
-    // Quality bonus for consistent good performance
-    if (quality >= 4 && card.qualityHistory.slice(-2).every(h => h.quality >= 4)) {
-      newEasiness += 0.05; // Bonus for consecutive good reviews
+      // Mature card - normal SM-2 progression
+      if (card.repetitions === 1) {
+        // Second review of graduated card
+        newInterval = 6;
+      } else {
+        // SM-2 interval calculation
+        newInterval = Math.round(card.interval * newEasiness);
+      }
+      newRepetitions = card.repetitions + 1;
+      isLearning = false;
     }
   }
-  
-  // Enhanced bounds with maximum cap
-  newEasiness = Math.max(1.3, Math.min(2.5, newEasiness));
-  newInterval = Math.max(1, Math.min(365, newInterval));
-  
-  // Apply randomization to prevent clustering (±10%)
-  const randomFactor = 0.9 + Math.random() * 0.2;
-  newInterval = Math.round(newInterval * randomFactor);
 
+  // Step 2: Update easiness factor (only for mature cards)
+  if (!wasInLearning || !isLearning) {
+    const deltaEF = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
+    newEasiness = Math.max(1.3, newEasiness + deltaEF);
+  }
+
+  // Step 3: Calculate next review date
   const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + newInterval);
+  if (newInterval < 1) {
+    // Sub-day intervals (learning phase)
+    nextReviewDate.setTime(nextReviewDate.getTime() + (newInterval * 24 * 60 * 60 * 1000));
+  } else {
+    // Day intervals
+    nextReviewDate.setDate(nextReviewDate.getDate() + Math.round(newInterval));
+  }
 
-  const updatedQualityHistory = [...card.qualityHistory, { date: new Date().toISOString(), quality }];
+  // Step 4: Update quality history
+  const updatedQualityHistory = [...card.qualityHistory, { 
+    date: new Date().toISOString(), 
+    quality,
+    interval: newInterval,
+    easiness: newEasiness,
+    isLearning
+  }];
 
   return {
     ...card,
@@ -77,9 +112,10 @@ const applySM2 = (card: Flashcard, quality: number, elaboration?: string): Flash
     lastReviewed: new Date().toISOString(),
     qualityHistory: updatedQualityHistory,
     lastElaboration: elaboration?.trim() ? elaboration.trim() : card.lastElaboration,
+    isLearning,
+    currentLearningStep,
   };
 };
-
 
 const PracticeSessionScreen = () => {
   const [allFlashcards, setAllFlashcards] = useLocalStorage<Flashcard[]>('flashcards', []);
@@ -97,10 +133,37 @@ const PracticeSessionScreen = () => {
   const { showNotification, permission, requestPermission } = useNotifications();
   const navigate = useNavigate();
 
+  // Check if session should continue (any cards still in learning or due within next hour)
+  const shouldContinueSession = useCallback(() => {
+    const now = new Date();
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour ahead
+    
+    return allFlashcards.some(fc => 
+      fc.deckId === DEFAULT_DECK_ID && 
+      (
+        // Cards due now or very soon (within 1 hour)
+        new Date(fc.nextReviewDate) <= oneHourFromNow ||
+        // Cards explicitly in learning phase
+        fc.isLearning ||
+        // New cards (never successfully graduated)
+        fc.repetitions === 0
+      )
+    );
+  }, [allFlashcards]);
+
+  // Enhanced session logic - continuous until all cards are learned
   useEffect(() => {
+    const now = new Date();
     const cardsToReview = allFlashcards
-      .filter(fc => fc.deckId === DEFAULT_DECK_ID && new Date(fc.nextReviewDate) <= new Date())
-      .sort((a, b) => new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime());
+      .filter(fc => fc.deckId === DEFAULT_DECK_ID && new Date(fc.nextReviewDate) <= now)
+      .sort((a, b) => {
+        // Priority: learning cards first, then by due date
+        const aIsLearning = a.isLearning || a.repetitions === 0;
+        const bIsLearning = b.isLearning || b.repetitions === 0;
+        if (aIsLearning && !bIsLearning) return -1;
+        if (!aIsLearning && bIsLearning) return 1;
+        return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
+      });
     
     setReviewQueue(cardsToReview);
     setCurrentCardIndex(0);
@@ -120,22 +183,57 @@ const PracticeSessionScreen = () => {
         showNotification("EstudioPro: Repaso Pendiente", { body: `Tienes ${cardsToReview.length} flashcards para repasar hoy.`, icon: '/icon-192.png' });
       }
     }
-  }, [allFlashcards, permission, requestPermission, showNotification]);
+  }, [allFlashcards, permission, requestPermission, showNotification, shouldContinueSession]);
+
+  // Auto-refresh queue every 30 seconds to catch cards that become due
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (reviewQueue.length === 0 && shouldContinueSession()) {
+        const now = new Date();
+        const newCardsToReview = allFlashcards
+          .filter(fc => fc.deckId === DEFAULT_DECK_ID && new Date(fc.nextReviewDate) <= now)
+          .sort((a, b) => {
+            const aIsLearning = a.isLearning || a.repetitions === 0;
+            const bIsLearning = b.isLearning || b.repetitions === 0;
+            if (aIsLearning && !bIsLearning) return -1;
+            if (!aIsLearning && bIsLearning) return 1;
+            return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
+          });
+        
+        if (newCardsToReview.length > 0) {
+          setReviewQueue(newCardsToReview);
+          setCurrentCardIndex(0);
+          setElaborationInputText(newCardsToReview[0]?.lastElaboration || '');
+          setAnimationState('idle');
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [reviewQueue.length, shouldContinueSession, allFlashcards]);
 
   const mapOutcomeToQuality = (outcome: ReviewOutcome): number => {
     switch (outcome) {
-      case ReviewOutcome.AGAIN: return 0; // Complete failure - forgot entirely
-      case ReviewOutcome.HARD: return 2;  // Difficult recall - remembered with effort
-      case ReviewOutcome.GOOD: return 4;  // Good recall - remembered well
-      case ReviewOutcome.EASY: return 5;  // Perfect recall - effortless
-      default: return 3; 
+      case ReviewOutcome.AGAIN: return 1; // Learning step restart
+      case ReviewOutcome.HARD: return 2;  // Difficult but progresses in learning
+      case ReviewOutcome.GOOD: return 4;  // Good recall, normal progression
+      case ReviewOutcome.EASY: return 5;  // Perfect recall, accelerated progression
+      default: return 3; // Minimum passing grade
     }
   };
 
-  // Helper function to get human-readable time estimates
+  // Helper function to get human-readable time estimates with learning support
   const getTimeEstimate = (days: number): string => {
+    if (days < 0.01) { // Less than ~15 minutes
+      const minutes = Math.round(days * 24 * 60);
+      return `${minutes} min`;
+    }
+    if (days < 1) { // Less than 1 day
+      const hours = Math.round(days * 24);
+      return hours === 1 ? "1 hora" : `${hours} horas`;
+    }
     if (days === 1) return "1 día";
-    if (days < 7) return `${days} días`;
+    if (days < 7) return `${Math.round(days)} días`;
     if (days < 30) {
       const weeks = Math.round(days / 7);
       return weeks === 1 ? "1 semana" : `${weeks} semanas`;
@@ -168,16 +266,81 @@ const PracticeSessionScreen = () => {
             setCurrentCardIndex(prev => prev + 1);
             setAnimationState('sliding-in');
         } else {
-            setElaborationInputText('');
-            setIsReflectionModalOpen(true);
-            setAnimationState('idle'); 
+            // Check if there are more cards to review (refreshed queue with immediate due cards)
+            if (shouldContinueSession()) {
+              // Get cards that are due now or very soon
+              const now = new Date();
+              const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes buffer
+              
+              const newCardsToReview = allFlashcards
+                .filter(fc => 
+                  fc.deckId === DEFAULT_DECK_ID && 
+                  new Date(fc.nextReviewDate) <= fiveMinutesFromNow
+                )
+                .sort((a, b) => {
+                  // Priority: learning cards first, then by due date
+                  const aIsLearning = a.isLearning || a.repetitions === 0;
+                  const bIsLearning = b.isLearning || b.repetitions === 0;
+                  if (aIsLearning && !bIsLearning) return -1;
+                  if (!aIsLearning && bIsLearning) return 1;
+                  return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
+                });
+              
+              if (newCardsToReview.length > 0) {
+                setReviewQueue(newCardsToReview);
+                setCurrentCardIndex(0);
+                setElaborationInputText(newCardsToReview[0]?.lastElaboration || '');
+                setAnimationState('sliding-in');
+              } else {
+                // If no immediate cards but session should continue, show waiting message
+                const hasCardsWithinHour = allFlashcards.some(fc => {
+                  const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+                  return fc.deckId === DEFAULT_DECK_ID && 
+                         new Date(fc.nextReviewDate) <= oneHourFromNow &&
+                         (fc.isLearning || fc.repetitions === 0);
+                });
+                
+                if (hasCardsWithinHour) {
+                  // Show temporary waiting state and refresh in a few seconds
+                  setTimeout(() => {
+                    // Recursively check again
+                    const refreshedCards = allFlashcards
+                      .filter(fc => 
+                        fc.deckId === DEFAULT_DECK_ID && 
+                        new Date(fc.nextReviewDate) <= new Date()
+                      );
+                    
+                    if (refreshedCards.length > 0) {
+                      setReviewQueue(refreshedCards.sort((a, b) => {
+                        const aIsLearning = a.isLearning || a.repetitions === 0;
+                        const bIsLearning = b.isLearning || b.repetitions === 0;
+                        if (aIsLearning && !bIsLearning) return -1;
+                        if (!aIsLearning && bIsLearning) return 1;
+                        return new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime();
+                      }));
+                      setCurrentCardIndex(0);
+                      setElaborationInputText(refreshedCards[0]?.lastElaboration || '');
+                      setAnimationState('sliding-in');
+                    }
+                  }, 3000); // Wait 3 seconds and check again
+                } else {
+                  setElaborationInputText('');
+                  setIsReflectionModalOpen(true);
+                  setAnimationState('idle');
+                }
+              }
+            } else {
+              setElaborationInputText('');
+              setIsReflectionModalOpen(true);
+              setAnimationState('idle'); 
+            }
         }
         
-        if (nextCardExists) {
+        if (nextCardExists || shouldContinueSession()) {
             setTimeout(() => setAnimationState('idle'), 300);
         }
     }, 300); 
-  }, [currentCardIndex, reviewQueue]);
+  }, [currentCardIndex, reviewQueue, shouldContinueSession, allFlashcards]);
 
 
   const handleReview = useCallback((outcome: ReviewOutcome) => {
@@ -203,26 +366,60 @@ const PracticeSessionScreen = () => {
     let toastText = "";
     let toastType: 'success' | 'error' | 'info' | 'warning' = 'info';
     const timeEstimate = getTimeEstimate(updatedCard.interval);
+    const wasLearning = currentCard.isLearning || currentCard.repetitions === 0;
+    const isNowLearning = updatedCard.isLearning;
 
     switch (quality) {
-        case 0: 
-            toastText = `❌ Olvidaste completamente. La verás de nuevo en ${timeEstimate}.`;
+        case 1: 
+            if (isNowLearning) {
+              toastText = `🔄 Reiniciando aprendizaje. La verás en ${timeEstimate}.`;
+            } else {
+              toastText = `🔄 Olvidada. Volviendo a aprender en ${timeEstimate}.`;
+            }
             toastType = 'error';
             break;
         case 2: 
-            toastText = `⚠️ Te costó recordarla. Próxima revisión en ${timeEstimate}.`;
+            if (isNowLearning) {
+              toastText = `⚠️ Progresando lentamente. Siguiente paso en ${timeEstimate}.`;
+            } else {
+              toastText = `⚠️ Difícil pero avanzas. Repaso en ${timeEstimate}.`;
+            }
             toastType = 'warning';
             break;
+        case 3: 
+            if (wasLearning && !isNowLearning) {
+              toastText = `🎓 ¡Graduada! Ahora la verás en ${timeEstimate}.`;
+              toastType = 'success';
+            } else if (isNowLearning) {
+              toastText = `📚 Aprendiendo. Siguiente paso en ${timeEstimate}.`;
+              toastType = 'info';
+            } else {
+              toastText = `✅ Recordada correctamente. Próxima en ${timeEstimate}.`;
+              toastType = 'info';
+            }
+            break;
         case 4: 
-            toastText = `✅ ¡Bien recordada! Próxima revisión en ${timeEstimate}.`;
-            toastType = 'success';
+            if (wasLearning && !isNowLearning) {
+              toastText = `🎓 ¡Graduada exitosamente! Próxima en ${timeEstimate}.`;
+              toastType = 'success';
+            } else if (isNowLearning) {
+              toastText = `📈 Buen progreso. Siguiente paso en ${timeEstimate}.`;
+              toastType = 'success';
+            } else {
+              toastText = `🎯 ¡Bien recordada! Próxima revisión en ${timeEstimate}.`;
+              toastType = 'success';
+            }
             break;
         case 5: 
-            toastText = `🎉 ¡Perfecta! Fue muy fácil. Próxima revisión en ${timeEstimate}.`;
+            if (wasLearning) {
+              toastText = `🚀 ¡Graduación rápida! Intervalo directo a ${timeEstimate}.`;
+            } else {
+              toastText = `🚀 ¡Perfecto! Intervalo extendido a ${timeEstimate}.`;
+            }
             toastType = 'success';
             break;
         default:
-            toastText = `Revisión registrada. Próxima en ${timeEstimate}.`; 
+            toastText = `📝 Revisión registrada. Próxima en ${timeEstimate}.`; 
             toastType = 'info';
     }
     setFeedbackToast({ text: toastText, type: toastType });
@@ -305,10 +502,71 @@ const PracticeSessionScreen = () => {
 
 
   if (reviewQueue.length === 0 && !isReflectionModalOpen) {
+    const now = new Date();
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+    
+    const learningCards = allFlashcards.filter(fc => 
+      fc.deckId === DEFAULT_DECK_ID && (fc.isLearning || fc.repetitions === 0)
+    ).length;
+    
+    const cardsWithinHour = allFlashcards.filter(fc => 
+      fc.deckId === DEFAULT_DECK_ID && 
+      new Date(fc.nextReviewDate) <= oneHourFromNow &&
+      (fc.isLearning || fc.repetitions === 0)
+    ).length;
+    
+    const nextCardTime = allFlashcards
+      .filter(fc => fc.deckId === DEFAULT_DECK_ID && (fc.isLearning || fc.repetitions === 0))
+      .map(fc => new Date(fc.nextReviewDate))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    
+    // If there are cards coming within the hour, show waiting message
+    if (cardsWithinHour > 0 && nextCardTime) {
+      const timeUntilNext = Math.ceil((nextCardTime.getTime() - now.getTime()) / (1000 * 60)); // minutes
+      
+      return (
+        <div className="p-4 text-center">
+          <h1 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-200">
+            🕐 Esperando próxima tarjeta
+          </h1>
+          <p className="text-slate-600 dark:text-slate-300 mb-6">
+            Tienes {cardsWithinHour} tarjeta{cardsWithinHour > 1 ? 's' : ''} en aprendizaje. 
+            La próxima aparecerá en {timeUntilNext <= 0 ? 'menos de 1' : timeUntilNext} minuto{timeUntilNext !== 1 ? 's' : ''}.
+          </p>
+          <div className="space-y-3">
+            <Button 
+              onClick={() => {
+                // Force refresh of queue
+                const immediateCards = allFlashcards.filter(fc => 
+                  fc.deckId === DEFAULT_DECK_ID && new Date(fc.nextReviewDate) <= new Date()
+                );
+                if (immediateCards.length > 0) {
+                  window.location.reload();
+                }
+              }} 
+              className="w-full"
+            >
+              🔄 Verificar tarjetas ahora
+            </Button>
+            <Button variant="ghost" onClick={() => navigate('/flashcards')} className="w-full">
+              Pausar sesión
+            </Button>
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className="p-4 text-center">
-        <h1 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-200">¡Todo repasado!</h1>
-        <p className="text-slate-600 dark:text-slate-300 mb-6">No hay flashcards pendientes de repaso.</p>
+        <h1 className="text-xl font-semibold mb-4 text-slate-700 dark:text-slate-200">
+          {learningCards > 0 ? '¡Sesión completada!' : '¡Todo repasado!'}
+        </h1>
+        <p className="text-slate-600 dark:text-slate-300 mb-6">
+          {learningCards > 0 ? 
+            `Excelente progreso. Tienes ${learningCards} tarjeta${learningCards > 1 ? 's' : ''} aún en aprendizaje que aparecerán según su programación (más de 1 hora).` :
+            'No hay flashcards pendientes de repaso.'
+          }
+        </p>
         <Button onClick={() => navigate('/flashcards')}>Volver a Flashcards</Button>
       </div>
     );
@@ -352,7 +610,7 @@ const PracticeSessionScreen = () => {
   }
   
   return (
-    <div className="p-4 flex flex-col h-[calc(100vh-120px)] sm:h-[calc(100vh-80px)] overflow-hidden">
+    <div className="p-4 flex flex-col h-[calc(100vh-120px)] sm:h-[calc(100vh-80px)]">
       <style>{`
         .flashcard-container {
           perspective: 1000px;
@@ -437,15 +695,21 @@ const PracticeSessionScreen = () => {
             <h1 className="text-2xl font-bold text-center text-slate-800 dark:text-slate-100">Sesión de Repaso</h1>
             <div className="flex justify-between items-center text-sm text-slate-500 dark:text-slate-400 mt-1">
               <span>Tarjeta {currentCardIndex + 1} de {reviewQueue.length}</span>
-              <span>Repeticiones: {currentCard.repetitions}</span>
+              <span>
+                {currentCard.isLearning || currentCard.repetitions === 0 ? 
+                  `🎓 Aprendiendo (paso ${(currentCard.currentLearningStep || 0) + 1})` : 
+                  `Repeticiones: ${currentCard.repetitions}`
+                }
+              </span>
             </div>
             <div className="flex justify-between items-center text-xs text-slate-400 dark:text-slate-500">
               <span>Dificultad: {currentCard.easiness.toFixed(1)}</span>
-              <span>Último intervalo: {getTimeEstimate(currentCard.interval)}</span>
-            </div>
-            {/* Debug info - remove in production */}
-            <div className="text-xs text-orange-500 text-center mt-1">
-              Estado: {showAnswer ? 'Respuesta visible' : 'Pregunta visible'} | Animación: {animationState} | Feedback: {feedbackToast ? 'Sí' : 'No'}
+              <span>
+                {currentCard.isLearning || currentCard.repetitions === 0 ? 
+                  "Estado: Aprendiendo" : 
+                  `Último intervalo: ${getTimeEstimate(currentCard.interval)}`
+                }
+              </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mt-2">
               <div className="bg-cyan-500 dark:bg-cyan-400 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progressPercentage}%` }}></div>
@@ -508,11 +772,6 @@ const PracticeSessionScreen = () => {
           </div>
 
           <div className="mt-6 w-full">
-            {/* Force show debug info */}
-            <div className="mb-4 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-xs">
-              Debug: showAnswer={showAnswer.toString()}, feedbackToast={feedbackToast ? 'true' : 'false'}, animationState={animationState}
-            </div>
-            
             {!showAnswer ? (
               <div className="text-center">
                 <Button onClick={() => setShowAnswer(true)} className="w-full" size="lg">
@@ -522,70 +781,81 @@ const PracticeSessionScreen = () => {
                   💡 Presiona Espacio o Enter para mostrar la respuesta
                 </p>
               </div>
-            ) : feedbackToast ? (
-              <div className="text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Procesando respuesta...
-                </p>
-              </div>
             ) : (
-              <div className="space-y-3 w-full">
-                <p className="text-center text-sm text-slate-600 dark:text-slate-300 mb-4">
-                  ¿Qué tan bien recordaste esta tarjeta?
-                </p>
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  <Button 
-                    onClick={() => handleReview(ReviewOutcome.AGAIN)} 
-                    className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 text-left p-4 h-auto flex flex-col items-start w-full" 
-                    size="md"
-                  >
-                    <span className="font-semibold">❌ Otra vez</span>
-                    <span className="text-xs opacity-90 mt-1">
-                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.AGAIN))}
-                    </span>
-                    <span className="text-xs opacity-75 mt-0.5">Tecla: 1</span>
-                  </Button>
-                  <Button 
-                    onClick={() => handleReview(ReviewOutcome.HARD)} 
-                    className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700 text-left p-4 h-auto flex flex-col items-start w-full" 
-                    size="md"
-                  >
-                    <span className="font-semibold">⚠️ Difícil</span>
-                    <span className="text-xs opacity-90 mt-1">
-                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.HARD))}
-                    </span>
-                    <span className="text-xs opacity-75 mt-0.5">Tecla: 2</span>
-                  </Button>
-                  <Button 
-                    onClick={() => handleReview(ReviewOutcome.GOOD)} 
-                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 text-left p-4 h-auto flex flex-col items-start w-full" 
-                    size="md"
-                  >
-                    <span className="font-semibold">✅ Bien</span>
-                    <span className="text-xs opacity-90 mt-1">
-                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.GOOD))}
-                    </span>
-                    <span className="text-xs opacity-75 mt-0.5">Tecla: 3</span>
-                  </Button>
-                  <Button 
-                    onClick={() => handleReview(ReviewOutcome.EASY)} 
-                    className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700 text-left p-4 h-auto flex flex-col items-start w-full" 
-                    size="md"
-                  >
-                    <span className="font-semibold">🎉 Fácil</span>
-                    <span className="text-xs opacity-90 mt-1">
-                      {getTimeEstimate(getPreviewInterval(ReviewOutcome.EASY))}
-                    </span>
-                    <span className="text-xs opacity-75 mt-0.5">Tecla: 4</span>
-                  </Button>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                    💡 Sé honesto: evaluaciones precisas = mejor aprendizaje a largo plazo
+              <div className="w-full">
+                {feedbackToast && (
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                      {feedbackToast.text}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-3 w-full">
+                  <p className="text-center text-sm text-slate-600 dark:text-slate-300 mb-4">
+                    ¿Cómo fue tu experiencia recordando esta información?
                   </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    ⌨️ Usa las teclas 1-4 para responder rápidamente
-                  </p>
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <Button 
+                      onClick={() => handleReview(ReviewOutcome.AGAIN)} 
+                      disabled={!!feedbackToast}
+                      className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 text-left p-4 h-auto flex flex-col items-start w-full disabled:opacity-50" 
+                      size="md"
+                    >
+                      <span className="font-semibold">🔄 Otra vez</span>
+                      <span className="text-xs opacity-90 mt-1">
+                        {getTimeEstimate(getPreviewInterval(ReviewOutcome.AGAIN))}
+                      </span>
+                      <span className="text-xs opacity-75 mt-0.5">Tecla: 1</span>
+                    </Button>
+                    <Button 
+                      onClick={() => handleReview(ReviewOutcome.HARD)} 
+                      disabled={!!feedbackToast}
+                      className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700 text-left p-4 h-auto flex flex-col items-start w-full disabled:opacity-50" 
+                      size="md"
+                    >
+                      <span className="font-semibold">⚠️ Difícil</span>
+                      <span className="text-xs opacity-90 mt-1">
+                        {getTimeEstimate(getPreviewInterval(ReviewOutcome.HARD))}
+                      </span>
+                      <span className="text-xs opacity-75 mt-0.5">Tecla: 2</span>
+                    </Button>
+                    <Button 
+                      onClick={() => handleReview(ReviewOutcome.GOOD)} 
+                      disabled={!!feedbackToast}
+                      className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 text-left p-4 h-auto flex flex-col items-start w-full disabled:opacity-50" 
+                      size="md"
+                    >
+                      <span className="font-semibold">✅ Bien</span>
+                      <span className="text-xs opacity-90 mt-1">
+                        {getTimeEstimate(getPreviewInterval(ReviewOutcome.GOOD))}
+                      </span>
+                      <span className="text-xs opacity-75 mt-0.5">Tecla: 3</span>
+                    </Button>
+                    <Button 
+                      onClick={() => handleReview(ReviewOutcome.EASY)} 
+                      disabled={!!feedbackToast}
+                      className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700 text-left p-4 h-auto flex flex-col items-start w-full disabled:opacity-50" 
+                      size="md"
+                    >
+                      <span className="font-semibold">🚀 Fácil</span>
+                      <span className="text-xs opacity-90 mt-1">
+                        {getTimeEstimate(getPreviewInterval(ReviewOutcome.EASY))}
+                      </span>
+                      <span className="text-xs opacity-75 mt-0.5">Tecla: 4</span>
+                    </Button>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+                      💡 Sé honesto contigo mismo: una evaluación precisa optimiza tu aprendizaje
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                      🔄 Otra vez = Reiniciar aprendizaje | ⚠️ Difícil = Progreso lento | ✅ Bien = Avance normal | 🚀 Fácil = Graduación rápida
+                    </p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      ⌨️ Usa las teclas 1-4 para responder rápidamente
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

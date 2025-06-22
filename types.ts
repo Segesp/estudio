@@ -6,16 +6,24 @@ export interface Flashcard {
   deckId: string;
   lastReviewed: string | null;
   nextReviewDate: string; 
-  // interval: number; // in days // This will be managed by SM-2, keeping it
-  // easeFactor: number; // for more advanced SM-2 like algo, simplified here // Will be replaced by 'easiness'
   lastElaboration?: string; // For user's notes during review
 
-  // New SM-2 specific fields based on user spec
+  // SM-2 specific fields with Anki enhancements
   tags: string[];
-  qualityHistory: { date: string, quality: number }[]; // quality: 0-5
+  qualityHistory: { 
+    date: string; 
+    quality: number; 
+    interval?: number; 
+    easiness?: number;
+    isLearning?: boolean; // Track if card was in learning phase
+  }[]; // Enhanced quality history with learning state tracking
   easiness: number; // difficulty factor, typically starts at 2.5
-  repetitions: number; // number of times this card has been successfully recalled (q >= 3)
-  interval: number; // The interval in days until the next review
+  repetitions: number; // number of times this card has been successfully graduated (not learning steps)
+  interval: number; // The interval in days until the next review (supports fractional days for learning)
+  
+  // Anki-style learning phase fields
+  isLearning?: boolean; // Whether card is in learning phase (new or lapsed)
+  currentLearningStep?: number; // Current step in learning sequence (0-based)
 }
 
 export interface Deck {
