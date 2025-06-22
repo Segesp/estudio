@@ -143,7 +143,7 @@ const FlashcardsScreen: React.FC = () => {
 
   const clearAllDefaultCards = async () => {
     if (window.confirm('¿Estás seguro de que quieres limpiar todas las flashcards del mazo principal?')) {
-      const defaultCards = flashcards.filter((fc: StoredFlashcard) => fc.deckId === DEFAULT_DECK_ID);
+      const defaultCards = flashcards.filter(fc => fc.deckId === DEFAULT_DECK_ID);
       for (const card of defaultCards) {
         if (card.id) {
           await deleteFlashcard(card.id);
@@ -185,8 +185,8 @@ const FlashcardsScreen: React.FC = () => {
     setIsImportModalOpen(false);
   };
 
-  const cardsInDefaultDeck = flashcards.filter((fc: StoredFlashcard) => fc.deckId === DEFAULT_DECK_ID);
-  const pendingReviewCount = cardsInDefaultDeck.filter((fc: StoredFlashcard) => new Date(fc.nextReviewDate) <= new Date()).length;
+  const cardsInDefaultDeck = flashcards.filter(fc => fc.deckId === DEFAULT_DECK_ID);
+  const pendingReviewCount = cardsInDefaultDeck.filter(fc => new Date(fc.nextReviewDate) <= new Date()).length;
   
   const displayCards = searchQuery ? searchResults : cardsInDefaultDeck;
 
