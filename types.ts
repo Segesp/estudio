@@ -121,4 +121,23 @@ export interface ScheduledEvent {
   description?: string;
   color?: string; // e.g., 'bg-red-500', 'bg-blue-500' for tailwind class
   createdAt: string;
+  
+  // Nuevos campos para planificación inteligente
+  technique?: 'spacing' | 'interleaving' | 'elaboration' | 'retrieval' | 'drawing' | 'pomodoro' | 'mixed';
+  relatedDeckId?: string; // ID del deck de flashcards relacionado
+  studyTopics?: string[]; // Temas de estudio para intercalado
+  topicProportions?: { [topic: string]: number }; // Proporciones para intercalado (0-1)
+  pomodoroSettings?: {
+    workMinutes: number;
+    breakMinutes: number;
+    sessionsCount: number;
+    longBreakMinutes: number;
+    longBreakInterval: number;
+  };
+  idealTimeSlot?: 'morning' | 'afternoon' | 'evening' | 'night';
+  cognitiveLoad?: 'low' | 'medium' | 'high'; // Para CLT optimization
+  isOptimalSpacing?: boolean; // Marcado automáticamente por SM-2
+  completed?: boolean;
+  performanceRating?: number; // 1-5 para feedback
+  energyLevel?: number; // 1-5 auto-reportado
 }
