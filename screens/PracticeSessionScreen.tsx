@@ -469,7 +469,7 @@ const PracticeSessionScreen = () => {
                   <Button
                     onClick={() => handleReview(ReviewOutcome.AGAIN)}
                     variant="secondary"
-                    className="flex flex-col items-center p-4 bg-red-100 hover:bg-red-200 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-700 dark:text-red-400"
+                    className="flex flex-col items-center p-4 bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600 dark:bg-red-500 dark:hover:bg-red-600 shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     <span className="text-lg font-semibold">🔄 Otra vez</span>
                     <span className="text-xs opacity-90 mt-1">
@@ -480,7 +480,7 @@ const PracticeSessionScreen = () => {
                   <Button
                     onClick={() => handleReview(ReviewOutcome.HARD)}
                     variant="secondary"
-                    className="flex flex-col items-center p-4 bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400"
+                    className="flex flex-col items-center p-4 bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500 hover:border-yellow-600 dark:bg-yellow-500 dark:hover:bg-yellow-600 shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     <span className="text-lg font-semibold">⚠️ Difícil</span>
                     <span className="text-xs opacity-90 mt-1">
@@ -491,7 +491,7 @@ const PracticeSessionScreen = () => {
                   <Button
                     onClick={() => handleReview(ReviewOutcome.GOOD)}
                     variant="secondary"
-                    className="flex flex-col items-center p-4 bg-green-100 hover:bg-green-200 dark:bg-green-900/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-400"
+                    className="flex flex-col items-center p-4 bg-green-500 hover:bg-green-600 text-white border-green-500 hover:border-green-600 dark:bg-green-500 dark:hover:bg-green-600 shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     <span className="text-lg font-semibold">✅ Bien</span>
                     <span className="text-xs opacity-90 mt-1">
@@ -502,7 +502,7 @@ const PracticeSessionScreen = () => {
                   <Button
                     onClick={() => handleReview(ReviewOutcome.EASY)}
                     variant="secondary"
-                    className="flex flex-col items-center p-4 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+                    className="flex flex-col items-center p-4 bg-blue-500 hover:bg-blue-600 text-white border-blue-500 hover:border-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600 shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     <span className="text-lg font-semibold">🚀 Fácil</span>
                     <span className="text-xs opacity-90 mt-1">
