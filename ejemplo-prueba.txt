@@ -1,0 +1,28 @@
+Fotosíntesis: El Proceso de Producción de Energía en las Plantas
+
+Definición y Importancia
+La fotosíntesis es el proceso biológico mediante el cual las plantas, algas y algunas bacterias convierten la energía luminosa del sol en energía química almacenada en forma de glucosa. Este proceso es fundamental para la vida en la Tierra, ya que produce el oxígeno que respiramos y forma la base de todas las cadenas alimentarias.
+
+Ecuación Química de la Fotosíntesis
+6CO₂ + 6H₂O + energía luminosa → C₆H₁₂O₆ + 6O₂
+
+Esta ecuación muestra que seis moléculas de dióxido de carbono se combinan con seis moléculas de agua, utilizando energía luminosa, para producir una molécula de glucosa y seis moléculas de oxígeno.
+
+Fases de la Fotosíntesis
+
+Fase Luminosa (Reacciones de Hill)
+- Ocurre en los tilacoides de los cloroplastos
+- La clorofila absorbe luz solar
+- Se produce la fotólisis del agua (H₂O → 2H⁺ + ½O₂ + 2e⁻)
+- Se genera ATP y NADPH como portadores de energía
+- Se libera oxígeno como subproducto
+
+Fase Oscura (Ciclo de Calvin)
+- Tiene lugar en el estroma de los cloroplastos
+- No requiere luz directa, pero usa productos de la fase luminosa
+- El CO₂ se fija mediante la enzima RuBisCO
+- Se utiliza ATP y NADPH para formar glucosa
+- El ciclo regenera RuBP para continuar el proceso
+
+Importancia Ecológica
+La fotosíntesis es responsable de aproximadamente el 70% del oxígeno atmosférico. Sin este proceso, la vida aeróbica tal como la conocemos no sería posible. Además, toda la energía que consumimos, directa o indirectamente, proviene originalmente de la fotosíntesis.

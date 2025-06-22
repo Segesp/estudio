@@ -47,7 +47,7 @@ const App: React.FC = () => {
   const toggleSettingsModal = () => setIsSettingsModalOpen(!isSettingsModalOpen);
 
   return (
-    <div className="min-h-screen flex flex-col dark:bg-slate-900">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
       <main className={`flex-grow ${showBottomNav ? 'pb-20 sm:pb-16' : ''} max-w-2xl mx-auto w-full`}>
         <Routes>
           <Route path="/" element={<HomeScreen />} />

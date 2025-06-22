@@ -89,6 +89,18 @@ const FlashcardsScreen: React.FC = () => {
       setFlashcards(prev => prev.filter(fc => fc.id !== id));
     }
   };
+
+  const handleClearAllCards = () => {
+    if (cardsInDefaultDeck.length === 0) {
+      alert('No hay flashcards para eliminar.');
+      return;
+    }
+    
+    const confirmMessage = `¿Estás seguro de que quieres eliminar TODAS las ${cardsInDefaultDeck.length} flashcards? Esta acción no se puede deshacer.`;
+    if (window.confirm(confirmMessage)) {
+      setFlashcards(prev => prev.filter(fc => fc.deckId !== DEFAULT_DECK_ID));
+    }
+  };
   
   const cardsInDefaultDeck = flashcards.filter(fc => fc.deckId === DEFAULT_DECK_ID);
   const pendingReviewCount = cardsInDefaultDeck.filter(fc => new Date(fc.nextReviewDate) <= new Date()).length;
@@ -104,6 +116,17 @@ const FlashcardsScreen: React.FC = () => {
           <Button onClick={() => setIsImportModalOpen(true)} size="sm" variant="secondary" leftIcon={<DocumentArrowUpIcon className="w-4 h-4"/>}>
             Importar
           </Button>
+          {cardsInDefaultDeck.length > 0 && (
+            <Button 
+              onClick={handleClearAllCards} 
+              size="sm" 
+              variant="secondary" 
+              leftIcon={<TrashIcon className="w-4 h-4"/>}
+              className="text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-700/50 dark:text-rose-400"
+            >
+              Limpiar todas
+            </Button>
+          )}
           <Button onClick={openModalForNew} size="sm" leftIcon={<PlusIcon className="w-4 h-4"/>}>
             Nueva
           </Button>

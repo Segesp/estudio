@@ -1,0 +1,31 @@
+Sistema Circulatorio Humano
+
+Componentes Principales
+
+El Corazón
+El corazón es un órgano muscular hueco que actúa como una bomba de doble circuito. Está dividido en cuatro cámaras: dos aurículas (superior derecha e izquierda) y dos ventrículos (inferior derecho e izquierdo). El ventrículo izquierdo es el más muscular porque debe bombear sangre a todo el cuerpo.
+
+Tipos de Vasos Sanguíneos
+
+Arterias: Vasos que llevan sangre oxigenada desde el corazón hacia los tejidos (excepto la arteria pulmonar). Tienen paredes gruesas y elásticas para soportar la alta presión.
+
+Venas: Transportan sangre desoxigenada de regreso al corazón (excepto las venas pulmonares). Poseen válvulas unidireccionales para prevenir el reflujo.
+
+Capilares: Vasos microscópicos donde ocurre el intercambio de gases, nutrientes y desechos entre la sangre y los tejidos.
+
+Circulación Doble
+
+Circulación Pulmonar (Menor):
+- Ventrículo derecho → Arteria pulmonar → Pulmones → Venas pulmonares → Aurícula izquierda
+- Función: Oxigenación de la sangre y eliminación de CO₂
+
+Circulación Sistémica (Mayor):
+- Ventrículo izquierdo → Aorta → Órganos y tejidos → Venas cavas → Aurícula derecha  
+- Función: Distribución de oxígeno y nutrientes, recolección de desechos
+
+Funciones del Sistema Circulatorio
+1. Transporte de oxígeno y nutrientes a las células
+2. Eliminación de dióxido de carbono y desechos metabólicos
+3. Regulación de la temperatura corporal
+4. Transporte de hormonas y células del sistema inmune
+5. Mantenimiento del equilibrio hídrico
