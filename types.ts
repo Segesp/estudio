@@ -1,4 +1,3 @@
-
 export interface Flashcard {
   id: string;
   front: string;
@@ -24,6 +23,14 @@ export interface Flashcard {
   // Anki-style learning phase fields
   isLearning?: boolean; // Whether card is in learning phase (new or lapsed)
   currentLearningStep?: number; // Current step in learning sequence (0-based)
+  
+  // Campos para optimización de la curva del olvido
+  difficulty?: 'easy' | 'medium' | 'hard';
+  section?: string;
+  cognitiveLevel?: 'recognition' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
+  forgettingCurveOptimized?: boolean;
+  cardType?: 'open_ended' | 'multiple_choice' | 'fill_in_blank';
+  choices?: string[]; // Para tarjetas de opción múltiple
 }
 
 export interface Deck {

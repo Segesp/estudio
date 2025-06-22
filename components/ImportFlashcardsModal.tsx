@@ -23,6 +23,8 @@ interface GeminiFlashcardResponseItem {
   answer: string;
   difficulty: 'easy' | 'medium' | 'hard';
   section: string;
+  cognitive_level?: 'recognition' | 'comprehension' | 'application' | 'analysis' | 'synthesis' | 'evaluation';
+  forgetting_curve_optimized?: boolean;
 }
 
 const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, onClose, setFlashcards, deckId }) => {
@@ -33,6 +35,8 @@ const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, o
   const [ocrProcessor] = useState(() => new OCRProcessor());
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<OCRResult | null>(null);
+  const [languageOption, setLanguageOption] = useState<'keep_original' | 'translate_to_spanish' | 'translate_to_english'>('keep_original');
+  const [targetLanguage, setTargetLanguage] = useState<string>('español');
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -56,42 +60,121 @@ const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, o
       }
     }
   };
-  
-  const constructGeminiPrompt = (documentChunkText: string): string => {
-    return `Analiza este contenido educativo y genera flashcards que ayuden al aprendizaje:
 
-CONTENIDO A ANALIZAR:
+  const getLanguageInstructions = (option: typeof languageOption, target: string): string => {
+    switch (option) {
+      case 'keep_original':
+        return `INSTRUCCIONES DE IDIOMA:
+- MANTÉN el idioma original del documento para todas las preguntas y respuestas
+- Respeta la terminología específica usada en el texto fuente
+- No traduzcas términos técnicos, nombres propios, o conceptos especializados`;
+      
+      case 'translate_to_spanish':
+        return `INSTRUCCIONES DE IDIOMA:
+- TRADUCE todas las preguntas y respuestas al ESPAÑOL
+- Mantén la precisión técnica y científica en la traducción
+- Conserva términos técnicos específicos cuando no tengan traducción exacta
+- Usa un español claro y académico apropiado para el contexto educativo`;
+      
+      case 'translate_to_english':
+        return `INSTRUCCIONES DE IDIOMA:
+- TRANSLATE all questions and answers to ENGLISH
+- Maintain technical and scientific accuracy in translation
+- Preserve specific technical terms when they don't have exact translations
+- Use clear, academic English appropriate for educational context`;
+      
+      default:
+        return `INSTRUCCIONES DE IDIOMA:
+- TRADUCE todas las preguntas y respuestas al ${target}
+- Mantén la precisión técnica y científica en la traducción
+- Conserva términos técnicos específicos cuando no tengan traducción exacta
+- Usa un lenguaje claro y académico apropiado para el contexto educativo`;
+    }
+  };
+  
+  const constructGeminiPrompt = (documentChunkText: string, languageInstructions: string): string => {
+    return `Como experto en ciencias cognitivas y técnicas de estudio basadas en evidencia, analiza este contenido educativo y genera flashcards optimizadas para superar la curva del olvido:
+
+CONTENIDO EDUCATIVO A ANALIZAR:
 ${documentChunkText}
 
-INSTRUCCIONES PARA EL ANÁLISIS:
-1. Lee y comprende profundamente el contenido, identificando conceptos clave, definiciones, procesos, y relaciones importantes.
-2. Ignora aspectos estructurales del texto (números de página, formato, etc.) y enfócate ÚNICAMENTE en la información educativa.
-3. Genera 3-5 preguntas que evalúen diferentes niveles de comprensión:
-   - Definiciones y conceptos clave
-   - Aplicación práctica de los conceptos
-   - Relaciones entre ideas
-   - Análisis y síntesis de la información
+${languageInstructions}
 
-FORMATO DE RESPUESTA (JSON):
+PRINCIPIOS PARA SUPERAR LA CURVA DEL OLVIDO:
+1. **Repetición espaciada**: Las tarjetas deben facilitar repasos programados
+2. **Recuperación activa**: Preguntas que requieren recordar activamente la información
+3. **Elaboración**: Conectar conceptos nuevos con conocimientos previos
+4. **Múltiples perspectivas**: Abordar la misma información desde diferentes ángulos
+5. **Aplicación práctica**: Preguntas que requieren usar el conocimiento
+
+ESTRATEGIAS DE GENERACIÓN:
+- **Cobertura completa**: Identifica TODOS los conceptos, definiciones, procesos, causas, efectos, ejemplos y relaciones importantes
+- **Granularidad óptima**: Una idea clave por tarjeta para facilitar la memorización
+- **Dificultad progresiva**: Desde reconocimiento básico hasta aplicación compleja
+- **Conexiones**: Preguntas que relacionen conceptos entre sí
+- **Casos prácticos**: Situaciones donde aplicar el conocimiento
+
+TIPOS DE PREGUNTAS REQUERIDAS:
+1. **Definiciones precisas** (¿Qué es...? ¿Cómo se define...?)
+2. **Características y propiedades** (¿Cuáles son las características de...?)
+3. **Procesos paso a paso** (¿Cómo ocurre...? ¿Cuál es el proceso de...?)
+4. **Causas y efectos** (¿Qué causa...? ¿Cuáles son las consecuencias de...?)
+5. **Comparaciones** (¿En qué se diferencia X de Y?)
+6. **Aplicaciones prácticas** (¿Cuándo se usa...? ¿Cómo se aplica...?)
+7. **Relaciones entre conceptos** (¿Cómo se relaciona X con Y?)
+8. **Ejemplos y contraejemplos** (¿Cuáles son ejemplos de...?)
+9. **Análisis crítico** (¿Por qué es importante...? ¿Qué implicaciones tiene...?)
+10. **Resolución de problemas** (¿Cómo se resolvería...?)
+
+INSTRUCCIONES ESPECÍFICAS:
+- Genera MÍNIMO 8-12 flashcards por fragmento (según la densidad del contenido)
+- Cubre TODA la información importante, no solo los conceptos principales
+- Usa terminología exacta del texto fuente (respetando las instrucciones de idioma)
+- Haz preguntas específicas y precisas, evita generalidades
+- Las respuestas deben ser completas pero concisas
+- Incluye números, fechas, fórmulas y datos específicos cuando aparezcan
+- Crea preguntas de diferentes niveles de dificultad
+- Asegúrate de que cada tarjeta sea independiente pero complementaria
+
+FORMATO DE RESPUESTA (JSON estricto):
 [{
-   "id": "uuid",
+   "id": "uuid-único",
    "type": "open_ended",
-   "question": "¿Qué es [concepto clave] y cuáles son sus características principales?",
-   "answer": "Respuesta completa basada en el contenido",
-   "difficulty": "medium",
-   "section": "Tema principal del fragmento"
+   "question": "Pregunta específica que requiere recuperación activa de información clave",
+   "answer": "Respuesta completa y precisa basada exactamente en el contenido proporcionado",
+   "difficulty": "easy|medium|hard",
+   "section": "Tema/sección específica del contenido",
+   "cognitive_level": "recognition|comprehension|application|analysis|synthesis|evaluation",
+   "forgetting_curve_optimized": true
 },
 {
-   "id": "uuid", 
-   "type": "multiple_choice",
-   "question": "¿Cuál de las siguientes afirmaciones sobre [concepto] es correcta?",
-   "choices": ["Opción basada en el contenido","Distractor plausible","Otro distractor","Distractor final"],
-   "answer": "Opción basada en el contenido",
+   "id": "uuid-único",
+   "type": "multiple_choice", 
+   "question": "Pregunta de opción múltiple que evalúe comprensión profunda",
+   "choices": ["Opción correcta basada en el texto","Distractor plausible pero incorrecto","Otro distractor relacionado","Distractor final creíble"],
+   "answer": "Opción correcta basada en el texto",
+   "difficulty": "easy|medium|hard", 
+   "section": "Tema/sección específica del contenido",
+   "cognitive_level": "recognition|comprehension|application|analysis|synthesis|evaluation",
+   "forgetting_curve_optimized": true
+},
+{
+   "id": "uuid-único",
+   "type": "fill_in_blank",
+   "question": "Oración con espacios en blanco: 'El proceso de _____ ocurre cuando _____, resultando en _____'",
+   "answer": "palabra1, palabra2, palabra3",
    "difficulty": "medium",
-   "section": "Tema principal del fragmento"
+   "section": "Tema específico",
+   "cognitive_level": "comprehension|application",
+   "forgetting_curve_optimized": true
 }]
 
-IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN REAL del contenido, no preguntar sobre el texto en sí.`;
+IMPORTANTE: 
+- NO inventes información que no esté en el texto
+- CADA concepto importante debe tener al menos 2-3 tarjetas desde diferentes ángulos
+- Las preguntas deben ser lo suficientemente específicas para evitar respuestas ambiguas
+- Prioriza la COMPRENSIÓN PROFUNDA sobre la memorización superficial
+- Asegúrate de que las tarjetas faciliten la construcción de una red sólida de conocimiento`;
   };
 
   const splitTextIntoChunks = (text: string, maxLength: number): string[] => {
@@ -189,15 +272,33 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
         return;
       }
 
-      setFeedbackMessage({ type: 'info', text: `${extractionInfo}. Generando flashcards...` });
+      setFeedbackMessage({ type: 'info', text: `${extractionInfo}. Generando flashcards${languageOption === 'keep_original' ? ' en el idioma original' : languageOption === 'translate_to_spanish' ? ' traducidas al español' : ' translated to English'}...` });
 
       // Paso 2: Procesar el texto extraído con Gemini
       const documentText = ocrResult.text;
 
       // Inicializar el gestor de tokens con tamaño muy pequeño
       const tokenManager = new GeminiTokenManager(20000); // Comenzar con chunks de solo 20K caracteres
-      const systemInstruction = "Eres un experto pedagogo que analiza contenido educativo y crea preguntas de estudio efectivas. Tu objetivo es identificar conceptos clave, procesos importantes y relaciones entre ideas para generar flashcards que faciliten el aprendizaje y la memorización del contenido real.";
-      const userPromptTemplate = constructGeminiPrompt("PLACEHOLDER_TEXT");
+      const systemInstruction = `Eres un experto en ciencias cognitivas, psicología del aprendizaje y técnicas de memorización basadas en evidencia científica. Tu especialidad es crear flashcards optimizadas para superar la curva del olvido utilizando:
+
+PRINCIPIOS CIENTÍFICOS DEL APRENDIZAJE:
+• **Efecto de espaciado (Spacing Effect)**: Distribuir el aprendizaje en el tiempo
+• **Efecto de prueba (Testing Effect)**: La recuperación activa fortalece la memoria
+• **Elaboración**: Conectar información nueva con conocimientos previos  
+• **Codificación dual**: Combinar información verbal y visual
+• **Principio de transferencia**: Aplicar conocimientos en nuevos contextos
+
+TÉCNICAS DE OPTIMIZACIÓN PARA LA MEMORIA:
+• **Granularidad atómica**: Una idea clave por tarjeta
+• **Dificultad deseable**: Reto cognitivo apropiado sin frustración
+• **Recuperación espaciada**: Preguntas que requieren esfuerzo mental
+• **Interferencia mínima**: Evitar confusión entre conceptos similares
+• **Aplicación contextual**: Conectar teoría con práctica
+
+Tu objetivo es crear un sistema de flashcards que maximice la retención a largo plazo y la comprensión profunda, facilitando la construcción de esquemas mentales sólidos y transferibles.`;
+      
+      const languageInstructions = getLanguageInstructions(languageOption, targetLanguage);
+      const userPromptTemplate = constructGeminiPrompt("PLACEHOLDER_TEXT", languageInstructions);
       
       console.log(`📄 Texto a procesar: ${documentText.length} caracteres`);
       console.log(`⚙️ Configuración inicial del gestor de tokens:`, tokenManager.getStats());
@@ -223,15 +324,15 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
 
       // Función para procesar un chunk individual
       const processChunk = async (chunkText: string): Promise<any> => {
-        const userPrompt = constructGeminiPrompt(chunkText);
+        const userPrompt = constructGeminiPrompt(chunkText, languageInstructions);
         const response: GenerateContentResponse = await ai.models.generateContent({
           model: "gemini-1.5-flash", // Usar modelo más estable
           contents: [{ role: "user", parts: [{text: userPrompt}] }],
           config: {
             systemInstruction: systemInstruction,
-            temperature: 0.3, // Aumentar creatividad para mejor análisis educativo
-            maxOutputTokens: 2048, // Reducido para ahorrar tokens
-            topP: 0.9, // Más diversidad en respuestas
+            temperature: 0.4, // Equilibrio entre creatividad y precisión para preguntas educativas
+            maxOutputTokens: 4096, // Aumentar para permitir más tarjetas por chunk
+            topP: 0.8, // Enfoque en respuestas de alta calidad
             responseMimeType: "application/json",
           }
         });
@@ -300,12 +401,26 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
             deckId: deckId,
             lastReviewed: null,
             nextReviewDate: new Date().toISOString(),
-            tags: ["imported", `difficulty:${item.difficulty}`, `section:${item.section || 'General'}`, `type:${item.type}`],
+            tags: [
+              "imported", 
+              `difficulty:${item.difficulty}`, 
+              `section:${item.section || 'General'}`, 
+              `type:${item.type}`,
+              ...(item.cognitive_level ? [`cognitive:${item.cognitive_level}`] : []),
+              ...(item.forgetting_curve_optimized ? ['optimized'] : [])
+            ],
             qualityHistory: [],
             easiness: 2.5,
             repetitions: 0,
             interval: 0,
             lastElaboration: '',
+            // Nuevos campos para optimización de la curva del olvido
+            difficulty: item.difficulty,
+            section: item.section,
+            cognitiveLevel: item.cognitive_level,
+            forgettingCurveOptimized: item.forgetting_curve_optimized,
+            cardType: item.type,
+            choices: item.choices
           }));
           
           allGeneratedFlashcards.push(...newFlashcardsFromChunk);
@@ -350,12 +465,26 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
                     deckId: deckId,
                     lastReviewed: null,
                     nextReviewDate: new Date().toISOString(),
-                    tags: ["imported", `difficulty:${item.difficulty}`, `section:${item.section || 'General'}`, `type:${item.type}`],
+                    tags: [
+                      "imported", 
+                      `difficulty:${item.difficulty}`, 
+                      `section:${item.section || 'General'}`, 
+                      `type:${item.type}`,
+                      ...(item.cognitive_level ? [`cognitive:${item.cognitive_level}`] : []),
+                      ...(item.forgetting_curve_optimized ? ['optimized'] : [])
+                    ],
                     qualityHistory: [],
                     easiness: 2.5,
                     repetitions: 0,
                     interval: 0,
                     lastElaboration: '',
+                    // Nuevos campos para optimización de la curva del olvido
+                    difficulty: item.difficulty,
+                    section: item.section,
+                    cognitiveLevel: item.cognitive_level,
+                    forgettingCurveOptimized: item.forgetting_curve_optimized,
+                    cardType: item.type,
+                    choices: item.choices
                   }));
                   
                   allGeneratedFlashcards.push(...newSubFlashcards);
@@ -439,6 +568,8 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
     setApiKeyMessage(null);
     setExtractedText(null);
     setOcrResult(null);
+    setLanguageOption('keep_original');
+    setTargetLanguage('español');
     
     // Limpiar recursos del OCR
     ocrProcessor.cleanup().catch(console.error);
@@ -450,21 +581,29 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
     <Modal isOpen={isOpen} onClose={handleClose} title="Importar Flashcards con IA">
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          Sube un archivo de documento para generar flashcards automáticamente con IA.
+          Sube un archivo de documento para generar flashcards automáticamente con IA optimizada para superar la curva del olvido.
           <br /><br />
           <strong>🔍 Tipos de archivo soportados:</strong>
-          <br />• <strong>PDFs:</strong> Extracción automática de texto
+          <br />• <strong>PDFs:</strong> Extracción automática de texto usando OCR con Gemini
           <br />• <strong>Imágenes (JPG, PNG, etc.):</strong> OCR para extraer texto de imágenes escaneadas
           <br />• <strong>Archivos de texto (TXT, MD, CSV):</strong> Lectura directa
           <br /><br />
-          <strong>🎓 Sistema de Análisis Educativo Inteligente:</strong>
-          <br />• <strong>Análisis profundo de contenido:</strong> La IA analiza conceptos, definiciones, procesos y relaciones importantes.
-          <br />• <strong>Preguntas educativas relevantes:</strong> Genera preguntas que evalúan comprensión, aplicación y análisis del contenido real.
-          <br />• <strong>Enfoque pedagógico:</strong> Ignora aspectos estructurales del texto y se enfoca en la información educativa.
-          <br />• <strong>Múltiples niveles de dificultad:</strong> Crea preguntas de diferentes tipos para evaluar distintos niveles de comprensión.
-          <br />• <strong>Procesamiento inteligente:</strong> Fragmentos de 20K caracteres para mejor análisis detallado.
+          <strong>🧠 Sistema de Flashcards Científicamente Optimizado:</strong>
+          <br />• <strong>Cobertura completa:</strong> Extrae TODOS los conceptos importantes del contenido
+          <br />• <strong>Curva del olvido:</strong> Diseñadas específicamente para superar el olvido natural
+          <br />• <strong>Recuperación activa:</strong> Preguntas que requieren esfuerzo mental para recordar
+          <br />• <strong>Múltiples niveles cognitivos:</strong> Desde reconocimiento hasta evaluación crítica
+          <br />• <strong>Granularidad óptima:</strong> Una idea clave por tarjeta para máxima eficacia
+          <br />• <strong>Dificultad progresiva:</strong> Fácil, medio y difícil balanceados estratégicamente
+          <br />• <strong>Aplicación práctica:</strong> Conecta teoría con contextos reales
           <br /><br />
-          <strong>💡 Mejora clave:</strong> Ahora genera preguntas sobre EL CONTENIDO y la INFORMACIÓN, no sobre el texto en sí.
+          <strong>🎯 Genera 8-12 tarjetas por fragmento:</strong>
+          <br />• Definiciones precisas y características clave
+          <br />• Procesos paso a paso y relaciones causa-efecto
+          <br />• Comparaciones y aplicaciones prácticas
+          <br />• Análisis crítico y resolución de problemas
+          <br /><br />
+          <strong>💡 Basado en evidencia científica:</strong> Utiliza principios de espaciado, elaboración y codificación dual para maximizar la retención a largo plazo.
         </p>
         {apiKeyMessage && (
             <p className="text-sm p-2 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-700/30 dark:text-amber-300">
@@ -495,6 +634,61 @@ IMPORTANTE: Las preguntas deben ayudar a estudiar y memorizar la INFORMACIÓN RE
               Archivo seleccionado: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
             </p>
           )}
+        </div>
+
+        {/* Configuración de idioma */}
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+            🌐 Configuración de Idioma para las Flashcards
+          </label>
+          <div className="space-y-3">
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="language-option"
+                value="keep_original"
+                checked={languageOption === 'keep_original'}
+                onChange={(e) => setLanguageOption(e.target.value as any)}
+                className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-slate-300 dark:border-slate-600"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                <strong>Mantener idioma original</strong> - Las flashcards se generarán en el mismo idioma del documento
+              </span>
+            </label>
+            
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="language-option"
+                value="translate_to_spanish"
+                checked={languageOption === 'translate_to_spanish'}
+                onChange={(e) => setLanguageOption(e.target.value as any)}
+                className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-slate-300 dark:border-slate-600"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                <strong>Traducir al español</strong> - Convertir preguntas y respuestas al español
+              </span>
+            </label>
+            
+            <label className="flex items-center space-x-3">
+              <input
+                type="radio"
+                name="language-option"
+                value="translate_to_english"
+                checked={languageOption === 'translate_to_english'}
+                onChange={(e) => setLanguageOption(e.target.value as any)}
+                className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-slate-300 dark:border-slate-600"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">
+                <strong>Translate to English</strong> - Convert questions and answers to English
+              </span>
+            </label>
+          </div>
+          
+          <div className="text-xs text-slate-500 dark:text-slate-500 bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+            <strong>💡 Consejo:</strong> Si el documento está en un idioma diferente al que prefieres estudiar, 
+            puedes traducir las flashcards para una mejor comprensión. La traducción mantiene la precisión técnica del contenido.
+          </div>
         </div>
 
         {feedbackMessage && (

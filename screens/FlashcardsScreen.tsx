@@ -156,8 +156,51 @@ const FlashcardsScreen: React.FC = () => {
             <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
               {cardsInDefaultDeck.map(card => (
                 <div key={card.id} className="p-3 bg-slate-100 dark:bg-slate-700 rounded-lg shadow-sm">
+                  {/* Tipo de tarjeta y dificultad */}
+                  {(card.cardType || card.difficulty) && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {card.cardType && (
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          card.cardType === 'multiple_choice' ? 'bg-blue-100 text-blue-700 dark:bg-blue-800 dark:text-blue-200' :
+                          card.cardType === 'fill_in_blank' ? 'bg-purple-100 text-purple-700 dark:bg-purple-800 dark:text-purple-200' :
+                          'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-200'
+                        }`}>
+                          {card.cardType === 'multiple_choice' ? 'Opción múltiple' :
+                           card.cardType === 'fill_in_blank' ? 'Completar' : 'Abierta'}
+                        </span>
+                      )}
+                      {card.difficulty && (
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          card.difficulty === 'easy' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-200' :
+                          card.difficulty === 'hard' ? 'bg-rose-100 text-rose-700 dark:bg-rose-800 dark:text-rose-200' :
+                          'bg-amber-100 text-amber-700 dark:bg-amber-800 dark:text-amber-200'
+                        }`}>
+                          {card.difficulty === 'easy' ? 'Fácil' : card.difficulty === 'hard' ? 'Difícil' : 'Medio'}
+                        </span>
+                      )}
+                      {card.forgettingCurveOptimized && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 dark:bg-cyan-800 dark:text-cyan-200">
+                          ⚡ Optimizada
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
                   <p className="font-medium text-slate-700 dark:text-slate-200 truncate">{card.front}</p>
                   <p className="text-sm text-slate-500 dark:text-slate-400 truncate">{card.back}</p>
+                  
+                  {/* Sección y nivel cognitivo */}
+                  {(card.section || card.cognitiveLevel) && (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500">
+                      {card.section && (
+                        <span>📂 {card.section}</span>
+                      )}
+                      {card.cognitiveLevel && (
+                        <span>🧠 {card.cognitiveLevel}</span>
+                      )}
+                    </div>
+                  )}
+                  
                   {card.tags && card.tags.length > 0 && (
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 truncate">
                       Etiquetas: {card.tags.join(', ')}
