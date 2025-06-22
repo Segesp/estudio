@@ -508,7 +508,7 @@ const PracticeSessionScreen = () => {
           </div>
 
           <div className="mt-6">
-            {!showAnswer && animationState === 'idle' ? (
+            {!showAnswer ? (
               <div className="text-center">
                 <Button onClick={() => setShowAnswer(true)} className="w-full" size="lg">
                   Mostrar Respuesta
@@ -517,7 +517,13 @@ const PracticeSessionScreen = () => {
                   💡 Presiona Espacio o Enter para mostrar la respuesta
                 </p>
               </div>
-            ) : showAnswer && animationState === 'idle' && !feedbackToast ? (
+            ) : feedbackToast ? (
+              <div className="text-center">
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Procesando respuesta...
+                </p>
+              </div>
+            ) : (
               <div className="space-y-3">
                 <p className="text-center text-sm text-slate-600 dark:text-slate-300 mb-4">
                   ¿Qué tan bien recordaste esta tarjeta?
@@ -576,25 +582,6 @@ const PracticeSessionScreen = () => {
                     ⌨️ Usa las teclas 1-4 para responder rápidamente
                   </p>
                 </div>
-              </div>
-            ) : feedbackToast ? (
-              <div className="text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-300">
-                  Procesando respuesta...
-                </p>
-              </div>
-            ) : (
-              <div className="text-center">
-                <Button 
-                  onClick={() => setShowAnswer(true)} 
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" 
-                  size="lg"
-                >
-                  Continuar
-                </Button>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                  Parece que hay un problema. Haz clic para continuar.
-                </p>
               </div>
             )}
           </div>
