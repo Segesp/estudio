@@ -507,7 +507,12 @@ const PracticeSessionScreen = () => {
             )}
           </div>
 
-          <div className="mt-6">
+          <div className="mt-6 w-full">
+            {/* Force show debug info */}
+            <div className="mb-4 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-xs">
+              Debug: showAnswer={showAnswer.toString()}, feedbackToast={feedbackToast ? 'true' : 'false'}, animationState={animationState}
+            </div>
+            
             {!showAnswer ? (
               <div className="text-center">
                 <Button onClick={() => setShowAnswer(true)} className="w-full" size="lg">
@@ -524,14 +529,14 @@ const PracticeSessionScreen = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 w-full">
                 <p className="text-center text-sm text-slate-600 dark:text-slate-300 mb-4">
                   ¿Qué tan bien recordaste esta tarjeta?
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 w-full">
                   <Button 
                     onClick={() => handleReview(ReviewOutcome.AGAIN)} 
-                    className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 text-left p-4 h-auto flex flex-col items-start" 
+                    className="bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800 text-left p-4 h-auto flex flex-col items-start w-full" 
                     size="md"
                   >
                     <span className="font-semibold">❌ Otra vez</span>
@@ -542,7 +547,7 @@ const PracticeSessionScreen = () => {
                   </Button>
                   <Button 
                     onClick={() => handleReview(ReviewOutcome.HARD)} 
-                    className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700 text-left p-4 h-auto flex flex-col items-start" 
+                    className="bg-orange-500 hover:bg-orange-600 text-white dark:bg-orange-600 dark:hover:bg-orange-700 text-left p-4 h-auto flex flex-col items-start w-full" 
                     size="md"
                   >
                     <span className="font-semibold">⚠️ Difícil</span>
@@ -553,7 +558,7 @@ const PracticeSessionScreen = () => {
                   </Button>
                   <Button 
                     onClick={() => handleReview(ReviewOutcome.GOOD)} 
-                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 text-left p-4 h-auto flex flex-col items-start" 
+                    className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800 text-left p-4 h-auto flex flex-col items-start w-full" 
                     size="md"
                   >
                     <span className="font-semibold">✅ Bien</span>
@@ -564,7 +569,7 @@ const PracticeSessionScreen = () => {
                   </Button>
                   <Button 
                     onClick={() => handleReview(ReviewOutcome.EASY)} 
-                    className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700 text-left p-4 h-auto flex flex-col items-start" 
+                    className="bg-lime-500 hover:bg-lime-600 text-white dark:bg-lime-600 dark:hover:bg-lime-700 text-left p-4 h-auto flex flex-col items-start w-full" 
                     size="md"
                   >
                     <span className="font-semibold">🎉 Fácil</span>
