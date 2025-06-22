@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
 import HomeScreen from './screens/HomeScreen';
