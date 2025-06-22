@@ -9,6 +9,7 @@ import PracticeSessionScreen from './screens/PracticeSessionScreen';
 import GoalsScreen from './screens/GoalsScreen';
 import WellbeingScreen from './screens/WellbeingScreen';
 import PomodoroScreen from './screens/PomodoroScreen';
+import CalendarScreen from './screens/CalendarScreen';
 import SettingsModal from './components/SettingsModal';
 import ReflectionsScreen from './screens/ReflectionsScreen'; 
 import ElaborationScreen from './screens/ElaborationScreen';
@@ -29,6 +30,7 @@ const App: React.FC = () => {
     "/", 
     "/strategies", 
     "/flashcards", 
+    "/calendar",
     "/goals", 
     "/wellbeing", 
     "/pomodoro", 
@@ -54,6 +56,7 @@ const App: React.FC = () => {
           <Route path="/strategies" element={<LearnMoreScreen />} />
           <Route path="/flashcards" element={<FlashcardsScreen />} />
           <Route path="/flashcards/practice" element={<PracticeSessionScreen />} />
+          <Route path="/calendar" element={<CalendarScreen />} />
           <Route path="/pomodoro" element={<PomodoroScreen />} />
           <Route path="/goals" element={<GoalsScreen />} />
           <Route path="/wellbeing" element={<WellbeingScreen />} />

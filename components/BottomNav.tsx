@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { HomeIcon, BookOpenIcon, RectangleStackIcon, CheckCircleIcon, SparklesIcon, TimerIcon, CogIcon } from '../ui-assets';
+import { HomeIcon, BookOpenIcon, RectangleStackIcon, CheckCircleIcon, SparklesIcon, TimerIcon, CogIcon, CalendarDaysIcon } from '../ui-assets';
 
 interface NavItemProps {
   to?: string;
@@ -48,13 +48,13 @@ interface BottomNavProps {
 const BottomNav: React.FC<BottomNavProps> = ({ onSettingsClick }) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white shadow-t-md border-t border-slate-200 p-1 z-50 dark:bg-slate-800 dark:border-slate-700">
-      <div className="max-w-md mx-auto grid grid-cols-6 gap-0.5"> {/* Updated to 6 columns */}
+      <div className="max-w-md mx-auto grid grid-cols-7 gap-0.5"> {/* Updated to 7 columns */}
         <NavItem to="/" label="Inicio" icon={<HomeIcon className="w-5 h-5" />} />
         <NavItem to="/strategies" label="Estrategias" icon={<BookOpenIcon className="w-5 h-5" />} />
         <NavItem to="/flashcards" label="Flashcards" icon={<RectangleStackIcon className="w-5 h-5" />} />
+        <NavItem to="/calendar" label="Calendario" icon={<CalendarDaysIcon className="w-5 h-5" />} />
         <NavItem to="/pomodoro" label="Pomodoro" icon={<TimerIcon className="w-5 h-5" />} />
         <NavItem to="/goals" label="Metas" icon={<CheckCircleIcon className="w-5 h-5" />} />
-        {/* <NavItem to="/wellbeing" label="Bienestar" icon={<SparklesIcon className="w-5 h-5" />} /> */}
         <NavItem onClick={onSettingsClick} label="Ajustes" icon={<CogIcon className="w-5 h-5" />} isButton={true} />
       </div>
     </nav>
