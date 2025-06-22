@@ -18,7 +18,39 @@ Una aplicación web inteligente para estudiantes universitarios, diseñada para 
 - Vite 6.2.0
 - React Router DOM 7.6.2
 - Google Gemini AI
-- Tailwind CSS
+- Tailwind CSS 3.4.4
+- PDF.js para procesamiento de documentos
+- Tesseract.js para OCR
+
+## 🚀 Deployment en Vercel
+
+### Preparación
+1. Asegúrate de que tu código esté en un repositorio de GitHub
+2. Crea una cuenta en [Vercel](https://vercel.com)
+3. Configura las variables de entorno necesarias
+
+### Variables de Entorno
+Crea las siguientes variables en el dashboard de Vercel:
+```
+GEMINI_API_KEY=tu_clave_de_gemini_aqui
+```
+
+### Deploy Automático
+1. Conecta tu repositorio de GitHub con Vercel
+2. Vercel detectará automáticamente que es un proyecto Vite
+3. El deploy se ejecutará automáticamente en cada push a main
+
+### Deploy Manual
+```bash
+# Instalar Vercel CLI
+npm i -g vercel
+
+# Hacer deploy
+vercel
+
+# Deploy a producción
+vercel --prod
+```
 
 ## 📋 Requisitos Previos
 
