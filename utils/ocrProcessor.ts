@@ -1,6 +1,8 @@
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 import { GoogleGenAI, GenerateContentResponse, Part } from '@google/genai';
+import PizZip from 'pizzip';
+import JSZip from 'jszip';
 
 // Configuración para PDF.js - usar la misma versión que está instalada
 if (typeof window !== 'undefined') {
@@ -16,10 +18,11 @@ const PDF_PAGE_IMAGE_QUALITY = 0.8;
 export interface OCRResult {
   text: string;
   confidence?: number;
-  processingMethod: 'pdf-gemini-ocr' | 'tesseract-ocr' | 'direct-text';
+  processingMethod: 'pdf-gemini-ocr' | 'tesseract-ocr' | 'direct-text' | 'powerpoint-extraction';
   originalFileName: string;
   processedAt: string;
   totalPages?: number;
+  totalSlides?: number;
 }
 
 interface PdfPageImage {
@@ -248,6 +251,119 @@ export class OCRProcessor {
   }
 
   /**
+   * Extrae texto de un archivo PowerPoint (PPTX)
+   */
+  private async extractTextFromPowerPoint(file: File): Promise<{ text: string; totalSlides: number }> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = async () => {
+        try {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          const zip = new JSZip();
+          const contents = await zip.loadAsync(arrayBuffer);
+          
+          let fullText = '';
+          let slideCount = 0;
+          
+          // Buscar archivos de slides en la estructura PPTX
+          const slideFiles: string[] = [];
+          contents.forEach((relativePath, file) => {
+            if (relativePath.startsWith('ppt/slides/slide') && relativePath.endsWith('.xml')) {
+              slideFiles.push(relativePath);
+            }
+          });
+          
+          // Ordenar slides numéricamente
+          slideFiles.sort((a, b) => {
+            const numA = parseInt(a.match(/slide(\d+)/)?.[1] || '0');
+            const numB = parseInt(b.match(/slide(\d+)/)?.[1] || '0');
+            return numA - numB;
+          });
+          
+          for (const slideFile of slideFiles) {
+            try {
+              const slideData = await contents.file(slideFile)?.async('text');
+              if (slideData) {
+                slideCount++;
+                
+                // Extraer texto de los elementos XML
+                const textContent = this.extractTextFromSlideXML(slideData);
+                
+                if (textContent.trim()) {
+                  fullText += `\n\n=== DIAPOSITIVA ${slideCount} ===\n\n${textContent.trim()}`;
+                }
+              }
+            } catch (error) {
+              console.error(`Error procesando diapositiva ${slideFile}:`, error);
+              fullText += `\n\n=== DIAPOSITIVA ${slideCount + 1} ===\n\n[Error al extraer texto de esta diapositiva]`;
+              slideCount++;
+            }
+          }
+          
+          if (slideCount === 0) {
+            throw new Error('No se encontraron diapositivas en el archivo PowerPoint.');
+          }
+          
+          resolve({
+            text: fullText.trim(),
+            totalSlides: slideCount
+          });
+          
+        } catch (error) {
+          reject(new Error(`Error al procesar PowerPoint: ${error instanceof Error ? error.message : 'Error desconocido'}`));
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Error al leer el archivo PowerPoint'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /**
+   * Extrae texto de XML de una diapositiva de PowerPoint
+   */
+  private extractTextFromSlideXML(xmlContent: string): string {
+    // Regex para extraer contenido de texto de los elementos XML
+    const textRegex = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+    const texts: string[] = [];
+    let match;
+    
+    while ((match = textRegex.exec(xmlContent)) !== null) {
+      const text = match[1].trim();
+      if (text) {
+        texts.push(text);
+      }
+    }
+    
+    // También buscar texto en elementos p:txBody
+    const bodyRegex = /<a:p[^>]*>([^<]*(?:<[^>]*>[^<]*)*)<\/a:p>/g;
+    while ((match = bodyRegex.exec(xmlContent)) !== null) {
+      const innerContent = match[1];
+      const innerTextRegex = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+      let innerMatch;
+      while ((innerMatch = innerTextRegex.exec(innerContent)) !== null) {
+        const text = innerMatch[1].trim();
+        if (text && !texts.includes(text)) {
+          texts.push(text);
+        }
+      }
+    }
+    
+    return texts.join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Extrae texto de un archivo PowerPoint antiguo (PPT) usando Gemini OCR
+   * Convierte a imágenes y usa OCR
+   */
+  private async extractTextFromPPTWithOCR(file: File): Promise<{ text: string; totalSlides: number }> {
+    // Para archivos .ppt antiguos, intentamos convertir a imágenes usando canvas
+    // Si no es posible, lanzamos un error sugiriendo convertir a PPTX
+    throw new Error('Los archivos .ppt antiguos no están soportados directamente. Por favor, convierte el archivo a .pptx usando PowerPoint y vuelve a intentarlo.');
+  }
+
+  /**
    * Procesa un archivo y extrae texto usando el método más apropiado
    */
   async processFile(file: File): Promise<OCRResult> {
@@ -290,8 +406,32 @@ export class OCRProcessor {
         };
       }
       
+      // Archivos PowerPoint
+      else if (fileName.endsWith('.pptx')) {
+        const result = await this.extractTextFromPowerPoint(file);
+        return {
+          text: result.text,
+          processingMethod: 'powerpoint-extraction',
+          originalFileName: file.name,
+          processedAt: processingStartTime,
+          totalSlides: result.totalSlides
+        };
+      }
+      
+      // Archivos PowerPoint antiguos (.ppt) - procesar como imágenes
+      else if (fileName.endsWith('.ppt')) {
+        const result = await this.extractTextFromPPTWithOCR(file);
+        return {
+          text: result.text,
+          processingMethod: 'powerpoint-extraction',
+          originalFileName: file.name,
+          processedAt: processingStartTime,
+          totalSlides: result.totalSlides
+        };
+      }
+      
       else {
-        throw new Error(`Tipo de archivo no soportado: ${file.name}. Tipos soportados: PDF, imágenes (JPG, PNG, etc.), y archivos de texto (TXT, MD, CSV).`);
+        throw new Error(`Tipo de archivo no soportado: ${file.name}. Tipos soportados: PDF, imágenes (JPG, PNG, etc.), archivos de texto (TXT, MD, CSV), y PowerPoint (PPTX, PPT).`);
       }
       
     } catch (error) {

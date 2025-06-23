@@ -51,12 +51,16 @@ const ImportFlashcardsModal: React.FC<ImportFlashcardsModalProps> = ({ isOpen, o
       const fileName = file.name.toLowerCase();
       if (fileName.endsWith('.pdf')) {
         setFeedbackMessage({ type: 'info', text: '📄 PDF seleccionado. Se convertirá a imágenes y se usará OCR con Gemini para extraer el texto.' });
+      } else if (fileName.endsWith('.pptx')) {
+        setFeedbackMessage({ type: 'info', text: '📊 PowerPoint seleccionado. Se extraerá el texto de todas las diapositivas.' });
+      } else if (fileName.endsWith('.ppt')) {
+        setFeedbackMessage({ type: 'info', text: '📊 PowerPoint antiguo seleccionado. Se recomienda convertir a .pptx para mejor compatibilidad.' });
       } else if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|tiff|webp)$/)) {
         setFeedbackMessage({ type: 'info', text: '🖼️ Imagen seleccionada. Se usará OCR para extraer el texto.' });
       } else if (fileName.match(/\.(txt|md|csv)$/)) {
         setFeedbackMessage({ type: 'info', text: '📝 Archivo de texto seleccionado. Se leerá directamente.' });
       } else {
-        setFeedbackMessage({ type: 'error', text: '❌ Tipo de archivo no soportado. Usa PDF, imágenes (JPG, PNG, etc.) o archivos de texto (TXT, MD, CSV).' });
+        setFeedbackMessage({ type: 'error', text: '❌ Tipo de archivo no soportado. Usa PDF, PowerPoint (PPTX/PPT), imágenes (JPG, PNG, etc.) o archivos de texto (TXT, MD, CSV).' });
       }
     }
   };
@@ -127,7 +131,7 @@ TIPOS DE PREGUNTAS REQUERIDAS:
 10. **Resolución de problemas** (¿Cómo se resolvería...?)
 
 INSTRUCCIONES ESPECÍFICAS:
-- Genera MÍNIMO 8-12 flashcards por fragmento (según la densidad del contenido)
+- Genera ÓPTIMO 10-15 flashcards por fragmento (aumentado para mejor eficiencia)
 - Cubre TODA la información importante, no solo los conceptos principales
 - Usa terminología exacta del texto fuente (respetando las instrucciones de idioma)
 - Haz preguntas específicas y precisas, evita generalidades
@@ -208,14 +212,18 @@ IMPORTANTE:
     while (currentPosition < text.length) {
       let partEnd = Math.min(currentPosition + maxSize, text.length);
       
-      // Buscar un punto de corte natural
+      // Buscar un punto de corte natural (optimizado)
       if (partEnd < text.length) {
-        const sentenceBreak = text.lastIndexOf('.', partEnd);
-        const paragraphBreak = text.lastIndexOf('\n', partEnd);
-        const spaceBreak = text.lastIndexOf(' ', partEnd);
+        // Buscar en orden de prioridad para cortes más eficientes
+        const breakPoints = [
+          text.lastIndexOf('\n\n', partEnd), // Párrafos
+          text.lastIndexOf('.', partEnd),    // Oraciones
+          text.lastIndexOf('\n', partEnd),   // Líneas
+          text.lastIndexOf(' ', partEnd)     // Espacios
+        ];
         
-        const breakPoint = Math.max(sentenceBreak, paragraphBreak, spaceBreak);
-        if (breakPoint > currentPosition && breakPoint > partEnd - (maxSize * 0.3)) {
+        const breakPoint = breakPoints.find(bp => bp > currentPosition && bp > partEnd - (maxSize * 0.2));
+        if (breakPoint && breakPoint > currentPosition) {
           partEnd = breakPoint + 1;
         }
       }
@@ -277,8 +285,8 @@ IMPORTANTE:
       // Paso 2: Procesar el texto extraído con Gemini
       const documentText = ocrResult.text;
 
-      // Inicializar el gestor de tokens con tamaño muy pequeño
-      const tokenManager = new GeminiTokenManager(20000); // Comenzar con chunks de solo 20K caracteres
+      // Inicializar el gestor de tokens con tamaño optimizado para velocidad
+      const tokenManager = new GeminiTokenManager(35000); // Aumentar de 20K a 35K para chunks más grandes
       const systemInstruction = `Eres un experto en ciencias cognitivas, psicología del aprendizaje y técnicas de memorización basadas en evidencia científica. Tu especialidad es crear flashcards optimizadas para superar la curva del olvido utilizando:
 
 PRINCIPIOS CIENTÍFICOS DEL APRENDIZAJE:
@@ -330,9 +338,9 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
           contents: [{ role: "user", parts: [{text: userPrompt}] }],
           config: {
             systemInstruction: systemInstruction,
-            temperature: 0.4, // Equilibrio entre creatividad y precisión para preguntas educativas
-            maxOutputTokens: 4096, // Aumentar para permitir más tarjetas por chunk
-            topP: 0.8, // Enfoque en respuestas de alta calidad
+            temperature: 0.3, // Reducir para mayor consistencia y velocidad
+            maxOutputTokens: 4096, // Mantener para permitir más tarjetas por chunk
+            topP: 0.9, // Aumentar para mejor variedad pero manteniendo velocidad
             responseMimeType: "application/json",
           }
         });
@@ -435,15 +443,15 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
           console.error(`❌ Error al procesar fragmento ${i + 1}:`, result.error);
           
           // Si el chunk falló, intentar dividirlo en partes más pequeñas
-          if (chunkText.length > 10000) { // Solo si es lo suficientemente grande para dividir
+          if (chunkText.length > 15000) { // Reducir umbral de 10000 a 15000 para mejor eficiencia
             console.log(`🔄 Intentando dividir fragmento ${i + 1} que falló...`);
             setFeedbackMessage({ 
               type: 'info', 
               text: `Fragmento ${i + 1} muy grande (${chunkText.length} chars). Dividiéndolo en partes más pequeñas...` 
             });
             
-            // Dividir el chunk fallido en partes más pequeñas
-            const smallerChunks = splitChunkIntoSmallerParts(chunkText, 8000); // 8K caracteres cada uno
+            // Dividir el chunk fallido en partes más eficientes
+            const smallerChunks = splitChunkIntoSmallerParts(chunkText, 12000); // Aumentar de 8K a 12K
             let subChunkSuccess = 0;
             
             for (let j = 0; j < smallerChunks.length; j++) {
@@ -503,8 +511,8 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
                 });
               }
               
-              // Pequeña pausa entre sub-chunks para evitar rate limiting
-              await new Promise(resolve => setTimeout(resolve, 500));
+              // Pequeña pausa entre sub-chunks para evitar rate limiting (optimizada)
+              await new Promise(resolve => setTimeout(resolve, 250)); // Reducido de 500ms a 250ms
             }
             
             if (subChunkSuccess > 0) {
@@ -530,9 +538,9 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
           }
         }
         
-        // Pausa entre chunks para evitar rate limiting
+        // Pausa entre chunks para evitar rate limiting (reducida para mayor velocidad)
         if (i < totalChunks - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 500)); // Reducido de 1000ms a 500ms
         }
       }
       
@@ -578,13 +586,14 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Importar Flashcards con IA">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Generar Flashcards con Documentos">
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-300">
           Sube un archivo de documento para generar flashcards automáticamente con IA optimizada para superar la curva del olvido.
           <br /><br />
           <strong>🔍 Tipos de archivo soportados:</strong>
           <br />• <strong>PDFs:</strong> Extracción automática de texto usando OCR con Gemini
+          <br />• <strong>PowerPoint (PPTX/PPT):</strong> Extracción directa del contenido de las diapositivas
           <br />• <strong>Imágenes (JPG, PNG, etc.):</strong> OCR para extraer texto de imágenes escaneadas
           <br />• <strong>Archivos de texto (TXT, MD, CSV):</strong> Lectura directa
           <br /><br />
@@ -597,7 +606,7 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
           <br />• <strong>Dificultad progresiva:</strong> Fácil, medio y difícil balanceados estratégicamente
           <br />• <strong>Aplicación práctica:</strong> Conecta teoría con contextos reales
           <br /><br />
-          <strong>🎯 Genera 8-12 tarjetas por fragmento:</strong>
+          <strong>🎯 Genera 10-15 tarjetas por fragmento optimizadas:</strong>
           <br />• Definiciones precisas y características clave
           <br />• Procesos paso a paso y relaciones causa-efecto
           <br />• Comparaciones y aplicaciones prácticas
@@ -622,11 +631,11 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
                   htmlFor="doc-upload-input"
                   className="relative cursor-pointer bg-white dark:bg-slate-700 rounded-md font-medium text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-cyan-500 dark:focus-within:ring-offset-slate-800"
                 >
-                  <span>Sube un archivo (PDF, imagen, texto)</span>
-                  <input id="doc-upload-input" name="doc-upload-input" type="file" className="sr-only" onChange={handleFileChange} accept=".txt,.pdf,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,.md,.csv" />
+                  <span>Sube un archivo (PDF, PowerPoint, imagen, texto)</span>
+                  <input id="doc-upload-input" name="doc-upload-input" type="file" className="sr-only" onChange={handleFileChange} accept=".txt,.pdf,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.webp,.md,.csv" />
                 </label>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-500">PDF, imágenes (OCR) y archivos de texto soportados</p>
+              <p className="text-xs text-slate-500 dark:text-slate-500">PDF, PowerPoint, imágenes (OCR) y archivos de texto soportados</p>
             </div>
           </div>
           {selectedFile && (
@@ -640,6 +649,10 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
                   ) : selectedFile.type === 'application/pdf' ? (
                     <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
                       <span className="text-2xl">📄</span>
+                    </div>
+                  ) : selectedFile.name.toLowerCase().match(/\.(ppt|pptx)$/) ? (
+                    <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center">
+                      <span className="text-2xl">📊</span>
                     </div>
                   ) : (
                     <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
@@ -800,6 +813,12 @@ Tu objetivo es crear un sistema de flashcards que maximice la retención a largo
                 <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
                   <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{ocrResult.totalPages}</p>
                   <p className="text-xs text-slate-500">Páginas</p>
+                </div>
+              )}
+              {ocrResult.totalSlides && (
+                <div className="bg-white dark:bg-slate-700 p-3 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">{ocrResult.totalSlides}</p>
+                  <p className="text-xs text-slate-500">Diapositivas</p>
                 </div>
               )}
             </div>

@@ -26,28 +26,28 @@ export interface GeminiConfig {
 }
 
 export class GeminiTokenManager {
-  private readonly MAX_INPUT_TOKENS = 800000; // Aún más conservador
-  private readonly MAX_OUTPUT_TOKENS = 2048; // Reducido para más espacio de input
-  private readonly SAFETY_MARGIN = 0.6; // 60% de margen de seguridad muy amplio
-  private readonly BASE_RETRY_DELAY = 1000;
-  private readonly MAX_RETRIES = 3;
+  private readonly MAX_INPUT_TOKENS = 1000000; // Aumentar para mejor throughput
+  private readonly MAX_OUTPUT_TOKENS = 4096; // Aumentar para más flashcards por chunk
+  private readonly SAFETY_MARGIN = 0.75; // Reducir el margen de seguridad para optimizar velocidad
+  private readonly BASE_RETRY_DELAY = 750; // Reducir delay para mayor velocidad
+  private readonly MAX_RETRIES = 2; // Reducir reintentos para mayor velocidad
   
   private currentChunkSize: number;
   private readonly minChunkSize: number;
   private readonly maxChunkSize: number;
   
-  constructor(initialChunkSize: number = 20000) { // Aún más pequeño
+  constructor(initialChunkSize: number = 30000) { // Aumentar tamaño inicial para menos chunks
     this.currentChunkSize = initialChunkSize;
-    this.minChunkSize = Math.max(5000, Math.floor(initialChunkSize * 0.1)); // Mínimo 5K caracteres
-    this.maxChunkSize = initialChunkSize;
+    this.minChunkSize = Math.max(8000, Math.floor(initialChunkSize * 0.15)); // Mínimo más grande
+    this.maxChunkSize = Math.min(50000, initialChunkSize * 2); // Permitir chunks más grandes
   }
 
   /**
    * Estima el número de tokens en un texto
-   * Usa una aproximación: 1 token ≈ 4 caracteres para español
+   * Usa una aproximación optimizada: 1 token ≈ 3.5 caracteres para español/inglés
    */
   private estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
+    return Math.ceil(text.length / 3.5);
   }
 
   /**
@@ -129,9 +129,9 @@ export class GeminiTokenManager {
    * Reduce el tamaño del chunk si hay errores de tokens
    */
   public reduceChunkSize(): boolean {
-    const newSize = Math.floor(this.currentChunkSize * 0.3); // Reducir 70% muy agresivo
+    const newSize = Math.floor(this.currentChunkSize * 0.7); // Reducir 30% menos agresivo
     if (newSize >= this.minChunkSize) {
-      console.log(`📉 Reduciendo chunk size de ${this.currentChunkSize} a ${newSize} (reducción del 70%)`);
+      console.log(`📉 Reduciendo chunk size de ${this.currentChunkSize} a ${newSize} (reducción del 30%)`);
       this.currentChunkSize = newSize;
       return true;
     }

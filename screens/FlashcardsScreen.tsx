@@ -289,7 +289,7 @@ const FlashcardsScreen: React.FC = () => {
         </div>
         <div className="flex space-x-2">
           <Button onClick={() => setIsImportModalOpen(true)} size="sm" variant="secondary" leftIcon={<DocumentArrowUpIcon className="w-4 h-4"/>}>
-            Importar
+            Generar con documentos
           </Button>
           <Button onClick={openModalForNew} leftIcon={<PlusIcon className="w-4 h-4" />}>
             Nueva
